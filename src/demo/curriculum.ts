@@ -1,0 +1,157 @@
+/**
+ * DEMO DATA (M1).
+ * A small, representative slice of the curriculum used only to render the
+ * Learn and Lesson shells. The real curriculum lives in versioned content
+ * tables from M3 (see docs/CURRICULUM.md). The *shape* below is the one the
+ * content model will use so the UI does not need rewriting.
+ */
+
+export type CefrLevel = 'A0' | 'A1' | 'A2' | 'B1' | 'B2' | 'C1'
+
+export type LessonKind =
+  | 'grammar'
+  | 'vocabulary'
+  | 'speaking'
+  | 'listening'
+  | 'reading'
+  | 'writing'
+  | 'assessment'
+
+export type LessonStatus = 'locked' | 'available' | 'in_progress' | 'completed' | 'skipped'
+
+export interface DemoLesson {
+  id: string
+  title: string
+  kind: LessonKind
+  estimatedMinutes: number
+  status: LessonStatus
+  score?: number
+}
+
+export interface DemoChapter {
+  id: string
+  level: CefrLevel
+  number: number
+  title: string
+  description: string
+  objectives: string[]
+  status: 'locked' | 'available' | 'in_progress' | 'completed'
+  progress: number
+  lessons: DemoLesson[]
+}
+
+export interface DemoLevelSummary {
+  level: CefrLevel
+  name: string
+  description: string
+  chapters: number
+  completedChapters: number
+}
+
+export const DEMO_LEVELS: DemoLevelSummary[] = [
+  { level: 'A0', name: 'Foundations', description: 'Sentence structure, to be, articles, basic questions.', chapters: 8, completedChapters: 8 },
+  { level: 'A1', name: 'Elementary', description: 'Present tenses, have/has, quantifiers, daily routines.', chapters: 10, completedChapters: 10 },
+  { level: 'A2', name: 'Pre-intermediate', description: 'Past tenses, future forms, modals, comparisons.', chapters: 12, completedChapters: 7 },
+  { level: 'B1', name: 'Intermediate', description: 'Perfect tenses, conditionals, passive, reported speech.', chapters: 14, completedChapters: 0 },
+  { level: 'B2', name: 'Upper-intermediate', description: 'Advanced conditionals, inversion, collocations, debate.', chapters: 14, completedChapters: 0 },
+  { level: 'C1', name: 'Advanced', description: 'Nuance, discourse markers, argumentation, presentations.', chapters: 12, completedChapters: 0 },
+]
+
+export const DEMO_CHAPTERS: DemoChapter[] = [
+  {
+    id: 'a2-06',
+    level: 'A2',
+    number: 6,
+    title: 'Past Simple: regular and irregular verbs',
+    description: 'Talk about finished events and tell short stories about your day.',
+    objectives: [
+      'Form regular past tense verbs with -ed',
+      'Use 25 high-frequency irregular verbs',
+      'Ask and answer questions with did',
+    ],
+    status: 'completed',
+    progress: 100,
+    lessons: [
+      { id: 'a2-06-01', title: 'Regular verbs and -ed endings', kind: 'grammar', estimatedMinutes: 12, status: 'completed', score: 92 },
+      { id: 'a2-06-02', title: 'Irregular verbs: the first 25', kind: 'vocabulary', estimatedMinutes: 15, status: 'completed', score: 84 },
+      { id: 'a2-06-03', title: 'Questions and negatives with did', kind: 'grammar', estimatedMinutes: 10, status: 'completed', score: 88 },
+      { id: 'a2-06-04', title: 'Talk about yesterday', kind: 'speaking', estimatedMinutes: 10, status: 'completed' },
+      { id: 'a2-06-05', title: 'Chapter check', kind: 'assessment', estimatedMinutes: 15, status: 'completed', score: 90 },
+    ],
+  },
+  {
+    id: 'a2-07',
+    level: 'A2',
+    number: 7,
+    title: 'Past Continuous and interrupted actions',
+    description: 'Describe what was happening when something else happened.',
+    objectives: [
+      'Form was/were + -ing',
+      'Combine Past Continuous with Past Simple using when and while',
+      'Narrate a short story with background and events',
+    ],
+    status: 'in_progress',
+    progress: 60,
+    lessons: [
+      { id: 'a2-07-01', title: 'was / were + -ing', kind: 'grammar', estimatedMinutes: 12, status: 'completed', score: 80 },
+      { id: 'a2-07-02', title: 'When and while', kind: 'grammar', estimatedMinutes: 12, status: 'completed', score: 72 },
+      { id: 'a2-07-03', title: 'Listening: a strange evening', kind: 'listening', estimatedMinutes: 10, status: 'in_progress' },
+      { id: 'a2-07-04', title: 'Tell a story about an interruption', kind: 'speaking', estimatedMinutes: 10, status: 'available' },
+      { id: 'a2-07-05', title: 'Chapter check', kind: 'assessment', estimatedMinutes: 15, status: 'locked' },
+    ],
+  },
+  {
+    id: 'a2-08',
+    level: 'A2',
+    number: 8,
+    title: 'Future forms: will, going to, Present Continuous',
+    description: 'Make predictions, plans and arrangements.',
+    objectives: ['Choose between will and going to', 'Use Present Continuous for arrangements', 'Talk about next week'],
+    status: 'available',
+    progress: 0,
+    lessons: [
+      { id: 'a2-08-01', title: 'will for predictions and decisions', kind: 'grammar', estimatedMinutes: 12, status: 'available' },
+      { id: 'a2-08-02', title: 'going to for plans', kind: 'grammar', estimatedMinutes: 12, status: 'locked' },
+      { id: 'a2-08-03', title: 'Reading: a weekend plan', kind: 'reading', estimatedMinutes: 10, status: 'locked' },
+      { id: 'a2-08-04', title: 'Describe your plans', kind: 'speaking', estimatedMinutes: 10, status: 'locked' },
+      { id: 'a2-08-05', title: 'Chapter check', kind: 'assessment', estimatedMinutes: 15, status: 'locked' },
+    ],
+  },
+  {
+    id: 'a2-09',
+    level: 'A2',
+    number: 9,
+    title: 'Modals: can, could, should, must',
+    description: 'Ability, advice, obligation and polite requests.',
+    objectives: ['Give advice with should', 'Express obligation with must and have to', 'Make polite requests'],
+    status: 'locked',
+    progress: 0,
+    lessons: [
+      { id: 'a2-09-01', title: 'can and could', kind: 'grammar', estimatedMinutes: 12, status: 'locked' },
+      { id: 'a2-09-02', title: 'should for advice', kind: 'grammar', estimatedMinutes: 12, status: 'locked' },
+      { id: 'a2-09-03', title: 'must vs have to', kind: 'grammar', estimatedMinutes: 12, status: 'locked' },
+      { id: 'a2-09-04', title: 'Roleplay: asking for help', kind: 'speaking', estimatedMinutes: 10, status: 'locked' },
+      { id: 'a2-09-05', title: 'Chapter check', kind: 'assessment', estimatedMinutes: 15, status: 'locked' },
+    ],
+  },
+]
+
+export function findChapter(id: string): DemoChapter | undefined {
+  return DEMO_CHAPTERS.find((chapter) => chapter.id === id)
+}
+
+export function findLesson(chapterId: string, lessonId: string) {
+  const chapter = findChapter(chapterId)
+  const lesson = chapter?.lessons.find((item) => item.id === lessonId)
+  return chapter && lesson ? { chapter, lesson } : undefined
+}
+
+export const LESSON_KIND_LABEL: Record<LessonKind, string> = {
+  grammar: 'Grammar',
+  vocabulary: 'Vocabulary',
+  speaking: 'Speaking',
+  listening: 'Listening',
+  reading: 'Reading',
+  writing: 'Writing',
+  assessment: 'Assessment',
+}

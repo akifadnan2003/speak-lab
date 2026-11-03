@@ -1,0 +1,373 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+/*
+ * SpeakLab design tokens
+ * ----------------------
+ * Semantic tokens live on :root (light) and .dark (dark). Tailwind utilities
+ * are generated from the `@theme inline` block below, so `bg-surface`,
+ * `text-fg-muted`, `border-line` etc. always resolve to the active theme.
+ * See docs/DESIGN_SYSTEM.md for the full token reference.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+
+  /* Brand scale: navy -> blue */
+  --brand-50: oklch(97.5% 0.012 260);
+  --brand-100: oklch(94% 0.03 260);
+  --brand-200: oklch(88% 0.06 260);
+  --brand-300: oklch(79% 0.1 260);
+  --brand-400: oklch(67% 0.16 260);
+  --brand-500: oklch(56% 0.2 262);
+  --brand-600: oklch(49% 0.2 263);
+  --brand-700: oklch(42% 0.18 264);
+  --brand-800: oklch(34% 0.14 265);
+  --brand-900: oklch(27% 0.1 266);
+  --brand-950: oklch(18% 0.06 266);
+
+  /* Surfaces */
+  --canvas: oklch(97.5% 0.005 255);
+  --surface: oklch(100% 0 0);
+  --surface-2: oklch(96% 0.006 255);
+  --surface-3: oklch(93% 0.008 255);
+  --overlay: oklch(100% 0 0);
+
+  /* Text */
+  --fg: oklch(20% 0.03 262);
+  --fg-muted: oklch(48% 0.02 260);
+  --fg-subtle: oklch(62% 0.015 260);
+  --fg-on-primary: oklch(99% 0 0);
+
+  /* Lines */
+  --line: oklch(90% 0.008 255);
+  --line-strong: oklch(82% 0.012 255);
+
+  /* Actions */
+  --primary: var(--brand-600);
+  --primary-hover: var(--brand-700);
+  --primary-soft: var(--brand-50);
+  --primary-soft-fg: var(--brand-700);
+  --ring: var(--brand-500);
+
+  /* Status */
+  --success: oklch(58% 0.14 160);
+  --success-soft: oklch(95% 0.04 160);
+  --success-soft-fg: oklch(40% 0.12 160);
+  --warning: oklch(72% 0.16 70);
+  --warning-soft: oklch(96% 0.05 80);
+  --warning-soft-fg: oklch(45% 0.12 60);
+  --danger: oklch(58% 0.21 25);
+  --danger-soft: oklch(95% 0.04 20);
+  --danger-soft-fg: oklch(42% 0.17 25);
+  --info: oklch(62% 0.15 230);
+  --info-soft: oklch(95% 0.03 230);
+  --info-soft-fg: oklch(42% 0.12 230);
+
+  /* Skill accents (restrained, used for chips and charts) */
+  --skill-grammar: oklch(56% 0.2 262);
+  --skill-vocabulary: oklch(60% 0.14 300);
+  --skill-speaking: oklch(62% 0.15 175);
+  --skill-listening: oklch(66% 0.15 60);
+  --skill-reading: oklch(58% 0.13 230);
+  --skill-writing: oklch(60% 0.14 340);
+
+  /* Shape & elevation */
+  --radius: 0.75rem;
+  --shadow-xs: 0 1px 2px oklch(20% 0.03 262 / 0.05);
+  --shadow-sm: 0 1px 3px oklch(20% 0.03 262 / 0.08), 0 1px 2px oklch(20% 0.03 262 / 0.04);
+  --shadow-md: 0 4px 12px oklch(20% 0.03 262 / 0.08), 0 2px 4px oklch(20% 0.03 262 / 0.04);
+  --shadow-lg: 0 12px 32px oklch(20% 0.03 262 / 0.12), 0 4px 8px oklch(20% 0.03 262 / 0.05);
+
+  /* Layout */
+  --sidebar-width: 16.5rem;
+  --topbar-height: 3.75rem;
+  --bottomnav-height: 4rem;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas: oklch(15% 0.025 262);
+  --surface: oklch(19% 0.026 262);
+  --surface-2: oklch(22.5% 0.027 262);
+  --surface-3: oklch(27% 0.028 262);
+  --overlay: oklch(21% 0.027 262);
+
+  --fg: oklch(95% 0.008 255);
+  --fg-muted: oklch(70% 0.015 258);
+  --fg-subtle: oklch(55% 0.015 258);
+  --fg-on-primary: oklch(99% 0 0);
+
+  --line: oklch(28% 0.025 262);
+  --line-strong: oklch(36% 0.03 262);
+
+  --primary: var(--brand-400);
+  --primary-hover: var(--brand-300);
+  --primary-soft: oklch(30% 0.08 262);
+  --primary-soft-fg: var(--brand-200);
+  --ring: var(--brand-400);
+
+  --success: oklch(70% 0.15 160);
+  --success-soft: oklch(28% 0.05 160);
+  --success-soft-fg: oklch(85% 0.1 160);
+  --warning: oklch(78% 0.16 75);
+  --warning-soft: oklch(30% 0.06 70);
+  --warning-soft-fg: oklch(88% 0.12 80);
+  --danger: oklch(68% 0.19 25);
+  --danger-soft: oklch(30% 0.07 20);
+  --danger-soft-fg: oklch(86% 0.1 20);
+  --info: oklch(72% 0.13 230);
+  --info-soft: oklch(28% 0.05 230);
+  --info-soft-fg: oklch(86% 0.08 230);
+
+  --skill-grammar: oklch(70% 0.15 262);
+  --skill-vocabulary: oklch(72% 0.13 300);
+  --skill-speaking: oklch(74% 0.13 175);
+  --skill-listening: oklch(78% 0.13 60);
+  --skill-reading: oklch(72% 0.12 230);
+  --skill-writing: oklch(72% 0.13 340);
+
+  --shadow-xs: 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px oklch(0% 0 0 / 0.4), 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-md: 0 4px 12px oklch(0% 0 0 / 0.45), 0 2px 4px oklch(0% 0 0 / 0.3);
+  --shadow-lg: 0 12px 32px oklch(0% 0 0 / 0.55), 0 4px 8px oklch(0% 0 0 / 0.35);
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-overlay: var(--overlay);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-on-primary: var(--fg-on-primary);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-fg: var(--primary-soft-fg);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-soft-fg: var(--success-soft-fg);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-soft-fg: var(--warning-soft-fg);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-fg: var(--danger-soft-fg);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-fg: var(--info-soft-fg);
+
+  --color-skill-grammar: var(--skill-grammar);
+  --color-skill-vocabulary: var(--skill-vocabulary);
+  --color-skill-speaking: var(--skill-speaking);
+  --color-skill-listening: var(--skill-listening);
+  --color-skill-reading: var(--skill-reading);
+  --color-skill-writing: var(--skill-writing);
+
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: calc(var(--radius) - 0.125rem);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.25rem);
+  --radius-2xl: calc(var(--radius) + 0.5rem);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --spacing-sidebar: var(--sidebar-width);
+  --spacing-topbar: var(--topbar-height);
+  --spacing-bottomnav: var(--bottomnav-height);
+  --spacing-safe-top: var(--safe-top);
+  --spacing-safe-bottom: var(--safe-bottom);
+  --spacing-safe-left: var(--safe-left);
+  --spacing-safe-right: var(--safe-right);
+
+  --animate-fade-in: fade-in 180ms ease-out;
+  --animate-slide-up: slide-up 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in-left: slide-in-left 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-scale-in: scale-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--canvas);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings:
+      'cv11' 1,
+      'ss01' 1;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  button,
+  [role='button'] {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  button:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
+  ::selection {
+    background: var(--primary-soft);
+    color: var(--primary-soft-fg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility sr-only-focusable {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  &:focus {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 100;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}

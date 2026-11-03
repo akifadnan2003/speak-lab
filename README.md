@@ -1,0 +1,76 @@
+# SpeakLab
+
+A premium, mobile-first, AI-powered English academy. Invitation-only, speaking-first, built for a
+tutor and their students.
+
+**Production:** https://akifadnan2003.github.io/speak-lab/
+**Status:** Milestone M1 complete (application foundation and design system). See
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+> The deployed site currently runs in **preview mode**: every screen renders with clearly-labelled
+> demo data and a fake local session so the UI can be reviewed. Authentication, analytics and AI are
+> not connected yet. Protected routes fail closed when preview mode is off.
+
+## Stack
+
+React 19 · TypeScript (strict) · Vite 8 · Tailwind CSS 4 · Radix UI primitives · Lucide icons ·
+React Router 8 (hash routing) · TanStack Query · Zustand · React Hook Form + Zod · Supabase (Auth,
+Postgres, RLS, Storage, Edge Functions) · vite-plugin-pwa · Vitest + Testing Library · Playwright ·
+GitHub Actions → GitHub Pages.
+
+## Development
+
+```bash
+npm install
+cp .env.example .env.local        # fill in later milestones; never commit secrets
+npm run dev                       # http://localhost:5173/speak-lab/
+```
+
+To review the UI shells locally, set `VITE_UI_PREVIEW=true` in `.env.local`.
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Vite dev server |
+| `npm run typecheck` | `tsc -b` with strict settings |
+| `npm run lint` | oxlint |
+| `npm run test` | Vitest unit and integration tests |
+| `npm run test:e2e` | Playwright (builds and serves the production bundle) |
+| `npm run build` | Production build into `dist/` |
+| `npm run preview` | Serve `dist/` locally under `/speak-lab/` |
+| `npm run check` | typecheck + lint + test + build |
+| `npm run icons` | Regenerate PWA icons from `public/icon-source.svg` |
+
+First time running Playwright: `npm run test:e2e:install`.
+
+## Project layout
+
+```
+src/
+  app/            App providers, router, PWA hooks
+  components/     ui/ (primitives), layout/ (shell), theme/, feedback/
+  config/         Validated environment access
+  demo/           Clearly-labelled demonstration data (M1 only)
+  features/       auth, dashboard, learn, lesson, speak, vocabulary, progress, tutor, settings
+  lib/            Utilities and the Supabase client factory
+  styles/         Design tokens and global CSS
+  test/           Vitest setup
+e2e/              Playwright specs
+docs/             Product, architecture, curriculum, design, security, roadmap, decisions, testing
+.github/          CI and GitHub Pages deployment
+```
+
+## Documentation
+
+- [`CLAUDE.md`](CLAUDE.md) — conventions for AI-assisted development sessions
+- [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/CURRICULUM.md`](docs/CURRICULUM.md)
+- [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)
+- [`docs/SECURITY.md`](docs/SECURITY.md)
+- [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- [`docs/DECISIONS.md`](docs/DECISIONS.md)
+- [`docs/TESTING.md`](docs/TESTING.md)
+
+## Licence
+
+Private project. All rights reserved.
