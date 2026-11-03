@@ -1,0 +1,216 @@
+import type { Answer, AnswerOf, Exercise, ExerciseOf, ExerciseType } from '@/features/curriculum/schema'
+import { containsPhrase, countWords, matchesAccepted, normalizeText } from './normalize'
+
+/**
+ * Deterministic grading. One pure function per exercise type; no randomness,
+ * no network, no AI. Partial credit is reported as `score` (0..1) for
+ * multi-part exercises and `parts` explains which part was wrong so the UI
+ * can highlight it.
+ */
+
+export interface GradePart {
+  /** Blank index, pair id, token index, requirement label … */
+  readonly key: string
+  readonly correct: boolean
+  /** Human-readable expected value for this part, shown when revealing. */
+  readonly expected?: string
+}
+
+export interface GradeResult {
+  readonly correct: boolean
+  /** 0..1 */
+  readonly score: number
+  readonly parts?: readonly GradePart[]
+  /** Display form of the (first) accepted answer. */
+  readonly correctAnswer: string
+}
+
+type Grader<T extends ExerciseType> = (exercise: ExerciseOf<T>, answer: AnswerOf<T>) => GradeResult
+
+const gradeMultipleChoice: Grader<'multiple_choice'> = (exercise, answer) => {
+  const correct = answer.optionId === exercise.correctOptionId
+  const expected = exercise.options.find((o) => o.id === exercise.correctOptionId)?.text ?? ''
+  return { correct, score: correct ? 1 : 0, correctAnswer: expected }
+}
+
+const gradeFillBlank: Grader<'fill_blank'> = (exercise, answer) => {
+  const parts = exercise.blanks.map<GradePart>((blank, i) => ({
+    key: String(i),
+    correct: matchesAccepted(answer.values[i] ?? '', blank.accepted),
+    expected: blank.accepted[0],
+  }))
+  const correctCount = parts.filter((p) => p.correct).length
+  return {
+    correct: correctCount === parts.length,
+    score: correctCount / parts.length,
+    parts,
+    correctAnswer: fillTemplate(exercise.text, exercise.blanks.map((b) => b.accepted[0] ?? '')),
+  }
+}
+
+/** Replace each `___` with the given values in order. */
+export function fillTemplate(text: string, values: readonly string[]): string {
+  let i = 0
+  return text.replace(/___/g, () => values[i++] ?? '___')
+}
+
+const gradeSentenceOrdering: Grader<'sentence_ordering'> = (exercise, answer) => {
+  const expected = exercise.tokens.join(' ')
+  const complete = answer.order.length === exercise.tokens.length && new Set(answer.order).size === answer.order.length
+  const candidate = answer.order.map((i) => exercise.tokens[i] ?? '').join(' ')
+  const accepted = [expected, ...(exercise.alternatives ?? [])]
+  const correct = complete && matchesAccepted(candidate, accepted, { keepQuestionMark: true })
+  const parts = exercise.tokens.map<GradePart>((token, i) => ({
+    key: String(i),
+    correct: complete && answer.order[i] === i,
+    expected: token,
+  }))
+  return { correct, score: correct ? 1 : 0, parts: correct ? undefined : parts, correctAnswer: expected }
+}
+
+const gradeErrorCorrection: Grader<'error_correction'> = (exercise, answer) => {
+  const correct = matchesAccepted(answer.text, exercise.accepted, { keepQuestionMark: true })
+  return { correct, score: correct ? 1 : 0, correctAnswer: exercise.accepted[0] ?? '' }
+}
+
+const gradeMatching: Grader<'matching'> = (exercise, answer) => {
+  const parts = exercise.pairs.map<GradePart>((pair) => ({
+    key: pair.id,
+    correct: answer.matches[pair.id] === pair.id,
+    expected: pair.right,
+  }))
+  const correctCount = parts.filter((p) => p.correct).length
+  return {
+    correct: correctCount === parts.length,
+    score: correctCount / parts.length,
+    parts,
+    correctAnswer: exercise.pairs.map((p) => `${p.left} → ${p.right}`).join('; '),
+  }
+}
+
+const gradeQuestionFormation: Grader<'question_formation'> = (exercise, answer) => {
+  // A question must end with a question mark; everything else is forgiving.
+  const endsWithQuestionMark = /\?\s*$/.test(answer.text)
+  const correct = endsWithQuestionMark && matchesAccepted(answer.text, exercise.accepted, { keepQuestionMark: true })
+  return { correct, score: correct ? 1 : 0, correctAnswer: exercise.accepted[0] ?? '' }
+}
+
+const gradeSentenceTransformation: Grader<'sentence_transformation'> = (exercise, answer) => {
+  const expectsQuestion = exercise.accepted.some((a) => a.trim().endsWith('?'))
+  const correct = matchesAccepted(answer.text, exercise.accepted, { keepQuestionMark: expectsQuestion })
+  return { correct, score: correct ? 1 : 0, correctAnswer: exercise.accepted[0] ?? '' }
+}
+
+/** Self-check: done when the learner confirms they said it and ticked every item. */
+const gradeSpeakingPrompt: Grader<'speaking_prompt'> = (exercise, answer) => {
+  const ticked = exercise.checklist.filter((_, i) => answer.checklist[i] === true).length
+  const correct = answer.done && ticked === exercise.checklist.length
+  return {
+    correct,
+    score: answer.done ? ticked / exercise.checklist.length : 0,
+    parts: exercise.checklist.map((label, i) => ({ key: label, correct: answer.checklist[i] === true })),
+    correctAnswer: exercise.modelAnswer,
+  }
+}
+
+const gradeGuidedWriting: Grader<'guided_writing'> = (exercise, answer) => {
+  const words = countWords(answer.text)
+  const parts: GradePart[] = [
+    { key: `At least ${exercise.minWords} words`, correct: words >= exercise.minWords },
+    ...exercise.requirements.map((r) => ({
+      key: r.label,
+      correct: r.anyOf.some((phrase) => containsPhrase(answer.text, phrase)),
+    })),
+  ]
+  const correctCount = parts.filter((p) => p.correct).length
+  return {
+    correct: correctCount === parts.length,
+    score: correctCount / parts.length,
+    parts,
+    correctAnswer: exercise.modelAnswer ?? '',
+  }
+}
+
+export function grade(exercise: Exercise, answer: Answer): GradeResult {
+  if (exercise.type !== answer.type) {
+    throw new Error(`Answer type ${answer.type} does not match exercise type ${exercise.type}`)
+  }
+  switch (exercise.type) {
+    case 'multiple_choice':
+      return gradeMultipleChoice(exercise, answer as AnswerOf<'multiple_choice'>)
+    case 'fill_blank':
+      return gradeFillBlank(exercise, answer as AnswerOf<'fill_blank'>)
+    case 'sentence_ordering':
+      return gradeSentenceOrdering(exercise, answer as AnswerOf<'sentence_ordering'>)
+    case 'error_correction':
+      return gradeErrorCorrection(exercise, answer as AnswerOf<'error_correction'>)
+    case 'matching':
+      return gradeMatching(exercise, answer as AnswerOf<'matching'>)
+    case 'question_formation':
+      return gradeQuestionFormation(exercise, answer as AnswerOf<'question_formation'>)
+    case 'sentence_transformation':
+      return gradeSentenceTransformation(exercise, answer as AnswerOf<'sentence_transformation'>)
+    case 'speaking_prompt':
+      return gradeSpeakingPrompt(exercise, answer as AnswerOf<'speaking_prompt'>)
+    case 'guided_writing':
+      return gradeGuidedWriting(exercise, answer as AnswerOf<'guided_writing'>)
+    default: {
+      const never: never = exercise
+      throw new Error(`Unhandled exercise type: ${String((never as { type?: string }).type)}`)
+    }
+  }
+}
+
+/** True when the learner has provided enough input to be checked. */
+export function isAnswerComplete(exercise: Exercise, answer: Answer): boolean {
+  switch (answer.type) {
+    case 'multiple_choice':
+      return answer.optionId.length > 0
+    case 'fill_blank':
+      return exercise.type === 'fill_blank' && exercise.blanks.every((_, i) => (answer.values[i] ?? '').trim().length > 0)
+    case 'sentence_ordering':
+      return exercise.type === 'sentence_ordering' && answer.order.length === exercise.tokens.length
+    case 'matching':
+      return exercise.type === 'matching' && exercise.pairs.every((p) => typeof answer.matches[p.id] === 'string')
+    case 'speaking_prompt':
+      // The learner can always press Done; an unticked checklist simply grades as incomplete.
+      return true
+    case 'error_correction':
+    case 'question_formation':
+    case 'sentence_transformation':
+    case 'guided_writing':
+      return normalizeText(answer.text).length > 0
+    default: {
+      const never: never = answer
+      return never
+    }
+  }
+}
+
+/** The neutral starting answer for an exercise. */
+export function emptyAnswer(exercise: Exercise): Answer {
+  switch (exercise.type) {
+    case 'multiple_choice':
+      return { type: 'multiple_choice', optionId: '' }
+    case 'fill_blank':
+      return { type: 'fill_blank', values: exercise.blanks.map(() => '') }
+    case 'sentence_ordering':
+      return { type: 'sentence_ordering', order: [] }
+    case 'error_correction':
+      return { type: 'error_correction', text: '' }
+    case 'matching':
+      return { type: 'matching', matches: {} }
+    case 'question_formation':
+      return { type: 'question_formation', text: '' }
+    case 'sentence_transformation':
+      return { type: 'sentence_transformation', text: '' }
+    case 'speaking_prompt':
+      return { type: 'speaking_prompt', done: false, checklist: exercise.checklist.map(() => false) }
+    case 'guided_writing':
+      return { type: 'guided_writing', text: '' }
+    default: {
+      const never: never = exercise
+      return never
+    }
+  }
+}

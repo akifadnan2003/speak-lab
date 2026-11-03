@@ -7,7 +7,7 @@ Last updated 2026-11-03. Status legend: ✅ done · 🔄 in progress · ⏳ plan
 | M0 | Repository, architecture, documentation, commands, test strategy | ✅ |
 | M1 | Application foundation and design system | ✅ |
 | M2 | Authentication and roles | ⏳ next |
-| M3 | Curriculum and exercise engine | ⏳ |
+| M3 | Curriculum and exercise engine | 🔄 frontend slice done; backend persistence pending |
 | M4 | Vocabulary and revision | ⏳ |
 | M5 | Student progress | ⏳ |
 | M6 | Tutor dashboard | ⏳ |
@@ -56,11 +56,36 @@ Acceptance criteria:
 - Authorization tests (seven scenarios in `docs/SECURITY.md`) passing in CI
 - Settings: profile name and preferences persisted
 
-## M3 — Curriculum and Exercise Engine ⏳
+## M3 — Curriculum and Exercise Engine 🔄
 
-Versioned content tables and Zod schemas; chapter/lesson/exercise renderer for the 20 exercise
-types with deterministic grading; attempts and progress persistence; unlock/skip overrides; one
-fully functional A2 chapter (Past Continuous) plus placement assessment skeleton.
+Design: `docs/superpowers/specs/2026-11-03-m3-curriculum-engine-design.md`.
+
+Done (frontend-independent slice, branch `worktree-m3-curriculum`):
+
+- [x] Zod schemas for chapters, lessons, content blocks and nine exercise types; curriculum-level
+      validation (unique ids, prerequisites exist, no cycles)
+- [x] Full A0 → C1 map (70 chapters) with objectives, skills and prerequisites; planned chapters
+      shown honestly as "not written yet"
+- [x] Exercise engine: deterministic grading with partial credit, text normalisation, hints,
+      explanations (EN + optional AZ), three-attempt practice / one-attempt assessment session
+      reducer, seeded shuffling
+- [x] Components: multiple choice, fill-in-the-blank (word bank), sentence ordering (tap + arrow
+      keys), error correction, matching (tap-tap), question formation, sentence transformation,
+      speaking prompt (self-checked, clearly labelled), guided writing (checklist), runner with
+      summary; keyboard and touch accessible, 320px-safe
+- [x] Chapter A0-01 fully authored: 11 lessons, 130+ exercises, 18+ speaking prompts, Azerbaijani
+      mechanism explanations
+- [x] Progression rules (unlock, assessment gating, chapter completion, tutor override model)
+- [x] `ContentSource` / `ProgressRepository` ports with static content + localStorage progress
+      (device-only, labelled in the UI); Learn, Chapter and Lesson screens and the Home "Continue"
+      card run on the real engine
+- [x] 71 new unit/component tests; e2e updated
+
+Remaining for M3 (needs M2 and backend work):
+
+- Supabase `ProgressRepository` and versioned `lesson_content` tables; tutor unlock/skip UI (M6)
+- Listening/dictation exercise types (need audio) and placement assessment content
+- Further chapters (A0-02 onward) authored with the same schemas
 
 ## M4 — Vocabulary and Revision ⏳
 

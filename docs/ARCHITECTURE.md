@@ -37,6 +37,9 @@ caller's JWT and role before using the service-role key.
 | `src/lib/supabase/client.ts` | Lazy `createClient` with anon key, PKCE, persisted session. Returns `null` when unconfigured. |
 | `src/features/auth/` | `AuthProvider` (session state machine), `guards.tsx`, login / recovery / callback / disabled screens. |
 | `src/features/*` | One folder per product area; pages import demo data today and queries tomorrow. |
+| `src/features/curriculum/` | Zod `schema/` (chapter, lesson, blocks, exercises, answers), `content/` (A0–C1 map + authored chapters, validated at import), `ports.ts` (`ContentSource`, `ProgressRepository`), `persistence/` (memory, localStorage), `progression.ts` (pure unlock/completion rules), `CurriculumProvider.tsx` (DI + TanStack Query hooks), `az-help.tsx` (Azerbaijani layer). |
+| `src/features/exercises/` | `engine/` (pure: `grade.ts`, `normalize.ts`, `session.ts` reducer, `shuffle.ts`), `components/` (one component per exercise type, `ExerciseRenderer`, `ExerciseRunner`, `ExerciseFeedback`). |
+| `src/features/learn/`, `src/features/lesson/` | Learn (levels + chapters), Chapter (lessons, objectives, completion rules), Lesson workspace (content blocks + runner, persistence wiring). |
 | `src/components/ui/` | Accessible primitives (Radix + cva): button, card, badge, input, label, dialog, sheet, tabs, progress (+ ring), switch, avatar, skeleton, tooltip, dropdown-menu, select, separator, empty-state, page-header, stat. |
 | `src/components/layout/` | `AppShell`, `DesktopSidebar` / `SidebarNav`, `BottomNav`, `TopBar`, `AuthLayout`, `Brand`, `nav.ts`. |
 | `src/components/theme/` | Zustand theme store, provider, toggle. |

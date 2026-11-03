@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SectionHeader } from '@/components/ui/page-header'
 import { Progress, ProgressRing } from '@/components/ui/progress'
-import { findLesson, LESSON_KIND_LABEL } from '@/demo/curriculum'
+import { useProgression } from '@/features/curriculum/CurriculumProvider'
+import { currentChapter, nextLesson } from '@/features/curriculum/progression'
+import { LESSON_KIND_LABEL } from '@/features/curriculum/schema'
 import {
   DEMO_ACHIEVEMENTS,
   DEMO_ASSIGNMENTS,
@@ -23,7 +25,10 @@ import { formatRelative, greetingFor } from '@/lib/utils'
 export function StudentHomePage() {
   const user = useCurrentUser()
   const snapshot = DEMO_STUDENT_SNAPSHOT
-  const next = findLesson(snapshot.currentChapterId, snapshot.currentLessonId)
+  const { states } = useProgression(user?.id ?? null)
+  const chapterState = states ? currentChapter(states) : undefined
+  const lessonState = chapterState ? nextLesson(chapterState) : undefined
+  const next = chapterState && lessonState ? { chapter: chapterState.chapter, lesson: lessonState.lesson } : undefined
   const firstName = user?.fullName.split(' ')[0] ?? 'there'
   const pending = DEMO_ASSIGNMENTS.filter((a) => a.status === 'pending')
   const speakingPct = Math.round((snapshot.speakingMinutesToday / snapshot.dailySpeakingTargetMinutes) * 100)
