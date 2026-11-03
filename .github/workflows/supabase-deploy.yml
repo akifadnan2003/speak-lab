@@ -60,7 +60,7 @@ jobs:
         # dialled is the one being checked (a query string or userinfo cannot smuggle a host).
         run: |
           python3 - <<'PY'
-          import os, sys, urllib.parse as u
+          import os, re, sys, urllib.parse as u
           url = os.environ.get('SUPABASE_DB_URL', '')
           ref = os.environ.get('SUPABASE_PROJECT_REF', '')
           if not url:
@@ -70,8 +70,16 @@ jobs:
           problems = []
           if p.scheme not in ('postgresql', 'postgres'): problems.append('scheme must be postgresql://')
           if p.username != f'postgres.{ref}': problems.append('user must be postgres.<project ref> for the linked project')
-          if not (p.hostname or '').endswith('.pooler.supabase.com'): problems.append('host must be the Session pooler (*.pooler.supabase.com)')
-          if p.port != 5432: problems.append('port must be 5432 (Session pooler, not Transaction pooler)')
+          host = (p.hostname or '').rstrip('.').lower()
+          if not re.fullmatch(r'aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com', host): problems.append('host must be the Session pooler (aws-<n>-<region>.pooler.supabase.com)')
+          authority = p.netloc
+          hostpart = authority.rsplit('@', 1)[-1]
+          if authority.count('@') != 1 or any(c in authority for c in ',[]') or re.search(r'\s', authority) or '%' in hostpart: problems.append('authority must be user:password@host:port with a single host and no options')
+          try:
+              port = p.port
+          except ValueError:
+              port = None
+          if port != 5432: problems.append('port must be 5432 (Session pooler, not Transaction pooler)')
           if p.path != '/postgres' or p.query or p.fragment or p.params: problems.append('path must be /postgres with no query string')
           if not p.password: problems.append('password is missing')
           if problems:
