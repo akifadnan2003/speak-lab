@@ -5,13 +5,18 @@ name: Supabase backend (manual)
 # applies migrations that the hosted project has not seen yet and refuses anything else.
 #
 # Supabase CLI 3.x targets the LOCAL stack by default, so every database command below passes
-# `--remote` (the linked hosted project) and the database password explicitly. Nothing here ever
-# starts a local stack.
+# `--remote=<url>`. GitHub-hosted runners are IPv4-only and the direct database endpoint is
+# IPv6, so the URL is the project's shared *Session pooler* (port 5432), which is IPv4-reachable.
+# Nothing here ever starts a local stack.
 #
 # Required repository secrets (least privilege, never exposed to the frontend build):
-#   SUPABASE_ACCESS_TOKEN  personal access token used by the CLI
+#   SUPABASE_ACCESS_TOKEN  personal access token used by the CLI (link, functions, secrets)
 #   SUPABASE_PROJECT_REF   the project ref (subdomain of the project URL)
-#   SUPABASE_DB_PASSWORD   database password (used only by `migration list --remote` and `db push --remote`)
+#   SUPABASE_DB_URL        Session pooler connection string from Dashboard > Connect > Session pooler,
+#                          with the database password filled in (URL-encode special characters):
+#                          postgresql://postgres.<ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres
+#   SUPABASE_DB_PASSWORD   kept for `supabase link` validation; not used for migrations any more
+# Secrets are read only from environment variables so their values are masked in the logs.
 
 on:
   workflow_dispatch:
@@ -43,21 +48,33 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+      - name: Check the database connection secret (value is never printed)
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Repository secret SUPABASE_DB_URL is missing. Copy the Session pooler string from Dashboard > Connect."
+            exit 1
+          fi
+          case "$SUPABASE_DB_URL" in
+            postgresql://postgres.${SUPABASE_PROJECT_REF}:*@*.pooler.supabase.com:5432/postgres) echo "Session pooler URL for the linked project: OK" ;;
+            *) echo "::error::SUPABASE_DB_URL must be the Session pooler string for project $SUPABASE_PROJECT_REF (postgresql://postgres.<ref>:<password>@<host>.pooler.supabase.com:5432/postgres)."; exit 1 ;;
+          esac
       - name: Link project
-        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
-      - name: Pending migrations (hosted project)
-        run: supabase migration list --remote --password "$SUPABASE_DB_PASSWORD"
-      - name: Apply migrations (additive, hosted project)
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+      - name: Pending migrations (hosted project via Session pooler)
+        run: supabase migration list --remote="$SUPABASE_DB_URL"
+      - name: Apply migrations (additive, hosted project via Session pooler)
         if: ${{ inputs.migrations && !inputs.dry_run }}
-        run: supabase db push --remote --password "$SUPABASE_DB_PASSWORD"
-      - name: Migrations dry run (hosted project)
+        run: supabase db push --remote="$SUPABASE_DB_URL" --yes
+      - name: Migrations dry run (hosted project via Session pooler)
         if: ${{ inputs.migrations && inputs.dry_run }}
-        run: supabase db push --remote --dry-run --password "$SUPABASE_DB_PASSWORD"
+        run: supabase db push --remote="$SUPABASE_DB_URL" --dry-run
       - name: Deploy Edge Functions
         if: ${{ inputs.functions && !inputs.dry_run }}
         run: supabase functions deploy student-admin --no-verify-jwt
@@ -67,5 +84,5 @@ jobs:
           supabase secrets set \
             SPEAKLAB_ALLOWED_APP_URLS="https://akifadnan2003.github.io/speak-lab/,http://localhost:5173/speak-lab/" \
             SPEAKLAB_INVITE_TTL_SECONDS="3600"
-      - name: Migration state after deploy (hosted project)
-        run: supabase migration list --remote --password "$SUPABASE_DB_PASSWORD"
+      - name: Migration state after deploy (hosted project via Session pooler)
+        run: supabase migration list --remote="$SUPABASE_DB_URL"

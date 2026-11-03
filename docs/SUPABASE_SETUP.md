@@ -62,8 +62,12 @@ Customising the two templates is therefore mandatory.
 
 - Repository **variables**: `VITE_SUPABASE_URL` = project URL, `VITE_SUPABASE_ANON_KEY` = the
   **publishable** key (`sb_publishable_…`). Both are already set.
-- Repository **secrets** (already set): `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`,
-  `SUPABASE_DB_PASSWORD`. Used only by the manual backend workflow, never by the frontend build.
+- Repository **secrets**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`
+  (already set) and `SUPABASE_DB_URL`: the **Session pooler** connection string from
+  *Dashboard → Connect → Session pooler* with the password filled in
+  (`postgresql://postgres.<ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres`).
+  GitHub runners are IPv4-only and the direct database endpoint is IPv6, so migrations go
+  through the pooler. Used only by the manual backend workflow, never by the frontend build.
 - Never create a repository variable or `.env` entry with `sb_secret_…` or the legacy
   `service_role` key. The deploy workflow fails if the public key starts with `sb_secret_`.
 
@@ -74,9 +78,10 @@ Backend changes are never applied by a frontend push. Use the manual workflow:
 1. GitHub → Actions → **Supabase backend (manual)** → *Run workflow* (or
    `gh workflow run supabase-deploy.yml`).
 2. Leave *migrations* and *functions* ticked. Tick *dry run* first if you want to see the plan.
-3. The job links the project with the secrets, prints `supabase migration list --remote`, runs
-   `supabase db push --remote` (additive: only migrations the project has not applied yet;
-   CLI 3.x targets the local stack unless `--remote` is given), deploys the
+3. The job validates that `SUPABASE_DB_URL` is the Session pooler string for the linked project
+   (without printing it), links the project, prints `supabase migration list --remote=<pooler url>`,
+   runs `supabase db push --remote=<pooler url>` (additive: only migrations the project has not
+   applied yet; CLI 3.x targets the local stack unless `--remote` is given), deploys the
    `student-admin` function with `--no-verify-jwt` (the function verifies callers itself), and
    sets the function secrets `SPEAKLAB_ALLOWED_APP_URLS` and `SPEAKLAB_INVITE_TTL_SECONDS`.
 
