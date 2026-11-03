@@ -84,10 +84,12 @@ test('tutor invites a student; the student accepts the emailed link, sets a pass
   const studentContext = await browser.newContext()
   const student = await studentContext.newPage()
   await student.goto(relativeLink(link))
-  // Secrets are removed from the address bar before anything renders.
-  await expect(student).toHaveURL(/\/speak-lab\/#\/auth\/callback\?flow=invite$/)
+  // The token is verified and removed from the address bar; the student lands on onboarding.
   await expect(student).toHaveURL(/#\/welcome$/, { timeout: 30_000 })
   expect(student.url()).not.toContain('token_hash')
+  await student.goBack()
+  expect(student.url()).not.toContain('token_hash')
+  await student.goForward()
 
   await student.getByLabel('New password').fill(STUDENT_PASSWORD)
   await student.getByLabel('Confirm password').fill(STUDENT_PASSWORD)
