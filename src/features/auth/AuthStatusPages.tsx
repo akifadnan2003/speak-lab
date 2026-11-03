@@ -21,12 +21,15 @@ export function AuthCallbackPage() {
   const [params] = useSearchParams()
   const hint = params.get('flow') ?? 'signin'
 
+  // Navigate as soon as the link produced a session. The flow is cleared only when this page
+  // unmounts: clearing it first would re-render the "no flow + authenticated" branch below and
+  // start a second, competing redirect to the user's home.
   useEffect(() => {
     if (flow?.status !== 'complete' || state.status !== 'authenticated') return
     const target = flow.type === 'invite' ? '/welcome' : flow.type === 'recovery' ? '/reset-password' : homePathFor(state.user.role)
-    clearFlow()
     navigate(target, { replace: true })
-  }, [flow, state, clearFlow, navigate])
+  }, [flow, state, navigate])
+  useEffect(() => () => clearFlow(), [clearFlow])
 
   if (flow?.status === 'error') {
     const invite = flow.type === 'invite' || hint === 'invite'
