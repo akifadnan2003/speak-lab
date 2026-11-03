@@ -71,3 +71,63 @@ loads 1–15 kB more. Revisit with `build.rolldownOptions.output.codeSplitting` 
 1.64, Tailwind 4.3, React Router 8.
 **Consequences.** Faster builds and checks. Some ecosystem docs still describe Vite 5/6 options
 (e.g. `manualChunks`); check the installed types before adopting snippets.
+
+## ADR-009 · Email links carry `token_hash` straight to the app; auth material is captured before the router mounts (2026-11-03)
+
+**Context.** Supabase admin invitations are not PKCE flows (no code verifier exists in the
+student's browser), so the default `{{ .ConfirmationURL }}` ends in a `/auth/v1/verify` redirect
+that returns tokens in the URL **fragment**. On GitHub Pages with `HashRouter`, the fragment is
+the route: the router would rewrite `#access_token=…` to `#/login` and lose the tokens. Recovery
+links have the same shape. Links must also work on iPhone Safari, Android Chrome and desktop
+browsers without relying on redirect behaviour.
+**Decision.** Custom *Invite* and *Reset password* templates link to
+`{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite|recovery` (query string before the
+hash). `captureAuthRedirect()` runs in `main.tsx` before React mounts: it parses token_hash,
+PKCE `code`, implicit fragments and provider errors, keeps them in memory, and rewrites the URL to
+`#/auth/callback?flow=…`. `AuthProvider` then calls `verifyOtp` / `exchangeCodeForSession`.
+Raw implicit-grant tokens in the fragment are rejected rather than passed to `setSession`, because
+a crafted link could sign a victim into an attacker's session (login CSRF). `detectSessionInUrl`
+is off. The hosted templates must be updated by hand (`docs/SUPABASE_SETUP.md` §1.3).
+**Consequences.** No dependency on the redirect allow-list for the invite link itself (the app URL
+is passed as `redirectTo` and still validated by Supabase and by the function allow-list). Tokens
+never persist in history. Default (non-customised) templates do not work, by design. Tested with
+real GoTrue emails in CI.
+
+## ADR-010 · One Edge Function for student administration; revocation = status + Auth ban (2026-11-03)
+
+**Context.** Invite, resend, revoke and disable/reactivate all need the same verification (caller
+JWT → Auth server → tutor role in the database) and the same service-role client. Separate
+functions would quadruple the boilerplate and the attack surface review. Revoking access must
+hold for sessions that already exist.
+**Decision.** A single `student-admin` function with an `action` discriminator and Zod schemas,
+deployed with `--no-verify-jwt` because it authenticates callers itself (this also works with the
+new publishable/secret API keys). Disable sets `profiles.status = 'disabled'` **and**
+`ban_duration` on the Auth user; every RLS policy requires `is_active()` except reading one's own
+profile row. Revoking a pending invitation deletes the unconfirmed Auth user so the emailed link
+dies. Resend re-invites (replacing a stale unconfirmed user when GoTrue refuses to re-send).
+**Consequences.** One deploy unit, one audit point. Immediate server-side denial for disabled
+students; refresh and sign-in refused; a short access-token window remains (documented in
+`docs/SECURITY.md` §6). Supersedes the four-function list in ADR-001's planning notes.
+
+## ADR-011 · Owner bootstrap is an administrative SQL function, never an endpoint (2026-11-03)
+
+**Context.** The previous plan allowed a one-time `bootstrap-owner` Edge Function guarded by a
+secret. Any reachable endpoint that can grant the tutor role is a liability, and email strings are
+not identities.
+**Decision.** `public.bootstrap_owner(uuid)` — `SECURITY DEFINER`, locked `search_path`, execute
+revoked from `anon`/`authenticated`, refuses client JWTs, requires a confirmed Auth user, idempotent
+for the existing owner, raises for anyone else once a tutor exists. A partial unique index enforces
+the single-tutor invariant at the storage level. Run once from the SQL editor with the verified
+User UID.
+**Consequences.** No bootstrap code ships to the browser or the function runtime. The procedure is
+documented and auditable (`account_events.owner_bootstrapped`). Tests prove a second tutor is
+impossible even for the service role.
+
+## ADR-012 · Preview mode is mutually exclusive with a configured backend (2026-11-03)
+
+**Context.** M1 deployed `VITE_UI_PREVIEW=true`. In M2 a real build must never show simulated
+tutor access, while the shell e2e suite still benefits from the demo session.
+**Decision.** `parseEnv` forces `uiPreview = false` when Supabase is configured; `vite.config.ts`
+throws if both are set; the deploy workflow no longer sets the flag and requires the public
+Supabase variables. Preview remains available for builds with no backend (shell e2e, local review).
+**Consequences.** Demo fixtures stay isolated and labelled; real builds fail closed by construction.

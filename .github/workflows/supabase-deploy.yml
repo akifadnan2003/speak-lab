@@ -1,0 +1,67 @@
+name: Supabase backend (manual)
+
+# Backend changes are NEVER applied by a frontend push. This workflow is started by hand from the
+# Actions tab (or `gh workflow run supabase-deploy.yml`). It is additive only: `supabase db push`
+# applies migrations that the hosted project has not seen yet and refuses anything else.
+#
+# Required repository secrets (least privilege, never exposed to the frontend build):
+#   SUPABASE_ACCESS_TOKEN  personal access token used by the CLI
+#   SUPABASE_PROJECT_REF   the project ref (subdomain of the project URL)
+#   SUPABASE_DB_PASSWORD   database password (used only for `db push`)
+
+on:
+  workflow_dispatch:
+    inputs:
+      migrations:
+        description: Apply pending database migrations (supabase db push)
+        type: boolean
+        default: true
+      functions:
+        description: Deploy Edge Functions
+        type: boolean
+        default: true
+      dry_run:
+        description: Show what would change without applying it
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-backend
+  cancel-in-progress: false
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    environment: supabase-production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link project
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+      - name: Pending migrations
+        run: supabase migration list
+      - name: Apply migrations (additive)
+        if: ${{ inputs.migrations && !inputs.dry_run }}
+        run: supabase db push
+      - name: Migrations dry run
+        if: ${{ inputs.migrations && inputs.dry_run }}
+        run: supabase db push --dry-run
+      - name: Deploy Edge Functions
+        if: ${{ inputs.functions && !inputs.dry_run }}
+        run: supabase functions deploy student-admin --no-verify-jwt
+      - name: Edge Function secrets
+        if: ${{ inputs.functions && !inputs.dry_run }}
+        run: |
+          supabase secrets set \
+            SPEAKLAB_ALLOWED_APP_URLS="https://akifadnan2003.github.io/speak-lab/,http://localhost:5173/speak-lab/" \
+            SPEAKLAB_INVITE_TTL_SECONDS="3600"
+      - name: Migration state after deploy
+        run: supabase migration list

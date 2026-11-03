@@ -41,7 +41,7 @@ export function StudentHomePage() {
             </Badge>
           </div>
         </div>
-        <DemoNotice />
+        <DemoNotice>Sample content. Real lessons, streaks and progress arrive from M3.</DemoNotice>
       </div>
 
       {/* Continue learning */}

@@ -7,6 +7,7 @@ This file is read at the start of every Claude Code session. Keep it short, curr
 SpeakLab: invitation-only, speaking-first English academy for a single tutor (the repository owner)
 and their students. Mobile-first PWA on GitHub Pages at `/speak-lab/`, Supabase backend.
 Full spec: `docs/PRODUCT_SPEC.md`. Roadmap and current milestone: `docs/ROADMAP.md`.
+Supabase operations (setup, bootstrap, deploy, rollback): `docs/SUPABASE_SETUP.md`.
 
 ## Non-negotiables (never regress)
 
@@ -15,16 +16,30 @@ Full spec: `docs/PRODUCT_SPEC.md`. Roadmap and current milestone: `docs/ROADMAP.
 - Students never see other students' data. RLS on every student-scoped table.
 - Service-role keys and AI provider keys never reach the browser. Privileged work runs in Edge
   Functions. Only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are public.
-- Protected routes fail closed. `VITE_UI_PREVIEW` is an M1-only review switch; remove it from the
-  deploy workflow when M2 ships.
+- Protected routes fail closed. `VITE_UI_PREVIEW` works only when Supabase is NOT configured
+  (build and runtime both refuse the combination); it is never set by the deploy workflow.
+- `profiles.role` / `status` / `email` are server-managed: column grants + trigger. Privileged
+  actions go through the `student-admin` Edge Function, which verifies the caller with
+  `auth.getUser()` and checks the tutor role in the database.
+- Owner bootstrap is `select public.bootstrap_owner('<auth user uuid>')` from the SQL editor.
+  Never add an endpoint that can grant the tutor role.
+- Backend changes ship only through `supabase/migrations/*.sql` + the manual
+  `supabase-deploy.yml` workflow. Never apply schema changes from the dashboard or on frontend push.
+- Email links must keep working on GitHub Pages: templates use `token_hash`, and
+  `captureAuthRedirect()` in `main.tsx` runs before the router (ADR-009). Do not turn on
+  `detectSessionInUrl`.
 - No fake buttons. If a feature is not connected, say so in the UI (`<DemoNotice>`), disable the
   control, or do not render it.
 - Demo data lives only in `src/demo/` and is labelled as such.
+- Anything kept on the device for a student (progress cache, drafts, offline queue) uses a
+  `speaklab.` storage prefix or registers a cleaner in `src/lib/local-data.ts`, so sign-out and
+  account switching purge it.
 
 ## Commands
 
 `npm run dev` · `npm run typecheck` · `npm run lint` · `npm run test` · `npm run test:e2e` ·
 `npm run build` · `npm run check` (all of the first four plus build).
+With Docker: `npx supabase start` · `npm run test:db` (RLS/lifecycle) · `npm run test:e2e:auth`.
 
 Never claim a check passed without running it. Never delete a meaningful test to make CI green.
 
@@ -48,9 +63,12 @@ Never claim a check passed without running it. Never delete a meaningful test to
 ## Testing conventions
 
 - Unit/integration: Vitest + Testing Library, colocated `*.test.ts(x)`. Setup in `src/test/setup.ts`.
-- Routing/guard tests mock `@/config/env` (see `src/app/router.test.tsx`).
-- E2E: Playwright in `e2e/`, runs against the production build with preview mode.
-- Every milestone adds tests for what it introduces. Authorization tests (RLS) arrive in M2.
+- Routing/guard tests mock `@/config/env` (see `src/app/router.test.tsx`); provider tests mock
+  `@/lib/supabase/client` with an in-memory fake (`AuthProvider.test.tsx`).
+- E2E: `e2e/shell.spec.ts` runs the preview build; `e2e/auth.spec.ts` runs the real-auth build
+  against the local Supabase stack with real Mailpit emails (CI `database` job).
+- RLS is proven only in `supabase/tests/` against Postgres. Never count a mock as RLS coverage.
+- Every milestone adds tests for what it introduces.
 
 ## Documentation upkeep
 

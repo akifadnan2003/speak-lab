@@ -38,3 +38,17 @@ describe('parseEnv', () => {
     expect(parseEnv({ VITE_UI_PREVIEW: 'yes' }, false).uiPreview).toBe(false)
   })
 })
+
+describe('parseEnv preview guard', () => {
+  it('refuses preview mode whenever Supabase is configured', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const env = parseEnv(
+      { VITE_SUPABASE_URL: 'https://abc.supabase.co', VITE_SUPABASE_ANON_KEY: 'sb_publishable_x', VITE_UI_PREVIEW: 'true' },
+      false,
+    )
+    expect(env.uiPreview).toBe(false)
+    expect(env.supabaseConfigured).toBe(true)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+})

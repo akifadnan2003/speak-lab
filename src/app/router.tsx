@@ -3,7 +3,7 @@ import { lazy } from 'react'
 import { createHashRouter, type RouteObject } from 'react-router'
 import { AppShell } from '@/components/layout/AppShell'
 import { AuthLayout } from '@/components/layout/AuthLayout'
-import { RedirectIfAuthenticated, RequireAuth, RequireRole } from '@/features/auth/guards'
+import { RedirectIfAuthenticated, RequireAuth, RequireOnboarded, RequireRole } from '@/features/auth/guards'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RoleHome } from './RoleHome'
 
@@ -19,6 +19,10 @@ const AuthCallbackPage = lazy(() =>
 )
 const AccountDisabledPage = lazy(() =>
   import('@/features/auth/AuthStatusPages').then((m) => ({ default: m.AccountDisabledPage })),
+)
+const WelcomePage = lazy(() => import('@/features/auth/WelcomePage').then((m) => ({ default: m.WelcomePage })))
+const ResetPasswordPage = lazy(() =>
+  import('@/features/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })),
 )
 const LearnPage = lazy(() => import('@/features/learn/LearnPage').then((m) => ({ default: m.LearnPage })))
 const ChapterPage = lazy(() => import('@/features/learn/ChapterPage').then((m) => ({ default: m.ChapterPage })))
@@ -47,6 +51,7 @@ const NotFoundPage = lazy(() => import('@/features/errors/NotFoundPage').then((m
  * Hash routing is used deliberately: GitHub Pages serves a static `index.html`
  * only at the project root, so `#/learn/...` survives refresh and direct
  * navigation without a 404 redirect hack. See docs/DECISIONS.md (ADR-003).
+ * Email links are processed before the router mounts (ADR-009).
  */
 export const routes: RouteObject[] = [
   {
@@ -61,38 +66,50 @@ export const routes: RouteObject[] = [
       },
       { path: '/auth/callback', element: <AuthCallbackPage /> },
       { path: '/account-disabled', element: <AccountDisabledPage /> },
+      {
+        element: <RequireAuth />,
+        children: [
+          { path: '/welcome', element: <WelcomePage /> },
+          { path: '/reset-password', element: <ResetPasswordPage /> },
+        ],
+      },
     ],
   },
   {
     element: <RequireAuth />,
     children: [
       {
-        element: <AppShell />,
+        element: <RequireOnboarded />,
         children: [
-          { path: '/', element: <RoleHome /> },
-          { path: '/settings', element: <SettingsPage /> },
           {
-            element: <RequireRole role="student" />,
+            element: <AppShell />,
             children: [
-              { path: '/learn', element: <LearnPage /> },
-              { path: '/learn/:chapterId', element: <ChapterPage /> },
-              { path: '/learn/:chapterId/lessons/:lessonId', element: <LessonWorkspacePage /> },
-              { path: '/speak', element: <SpeakPage /> },
-              { path: '/speak/:modeId', element: <SpeakSessionPage /> },
-              { path: '/vocabulary', element: <VocabularyPage /> },
-              { path: '/progress', element: <ProgressPage /> },
+              { path: '/', element: <RoleHome /> },
+              { path: '/settings', element: <SettingsPage /> },
+              {
+                element: <RequireRole role="student" />,
+                children: [
+                  { path: '/learn', element: <LearnPage /> },
+                  { path: '/learn/:chapterId', element: <ChapterPage /> },
+                  { path: '/learn/:chapterId/lessons/:lessonId', element: <LessonWorkspacePage /> },
+                  { path: '/speak', element: <SpeakPage /> },
+                  { path: '/speak/:modeId', element: <SpeakSessionPage /> },
+                  { path: '/vocabulary', element: <VocabularyPage /> },
+                  { path: '/progress', element: <ProgressPage /> },
+                ],
+              },
+              {
+                element: <RequireRole role="tutor" />,
+                children: [
+                  { path: '/tutor', element: <MyStudentsPage /> },
+                  { path: '/tutor/curriculum', element: <TutorCurriculumPage /> },
+                  { path: '/tutor/students/:studentId', element: <StudentDetailPage /> },
+                  { path: '/tutor/students/:studentId/:section', element: <StudentDetailPage /> },
+                ],
+              },
+              { path: '*', element: <NotFoundPage /> },
             ],
           },
-          {
-            element: <RequireRole role="tutor" />,
-            children: [
-              { path: '/tutor', element: <MyStudentsPage /> },
-              { path: '/tutor/curriculum', element: <TutorCurriculumPage /> },
-              { path: '/tutor/students/:studentId', element: <StudentDetailPage /> },
-              { path: '/tutor/students/:studentId/:section', element: <StudentDetailPage /> },
-            ],
-          },
-          { path: '*', element: <NotFoundPage /> },
         ],
       },
     ],

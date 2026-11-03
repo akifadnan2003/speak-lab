@@ -3,6 +3,11 @@
 Last updated for milestone M1 (2026-11-03). The content model ships in M3; this document is the
 sequencing source of truth that M3 will encode as versioned content.
 
+> **M3 sequencing correction (2026-11-03).** Implementation starts with a proper **A0/A1
+> foundation chapter** before any A2 material. The A2 Past Continuous chapter is the exercise-engine
+> showcase, reached through placement-based acceleration, not the default starting point. Every
+> learner's journey begins at zero unless placement or the tutor says otherwise.
+
 ## 1. Teaching philosophy
 
 - **Speaking first.** Every chapter ends with spoken production; comprehension and production are

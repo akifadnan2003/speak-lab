@@ -27,17 +27,28 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test -- --reporter=dot
+      - name: Require production Supabase configuration
+        # The site must never ship without a backend: the app would fail closed (login only),
+        # which is safe but useless. Fail the deploy loudly instead.
+        run: |
+          if [ -z "${{ vars.VITE_SUPABASE_URL }}" ] || [ -z "${{ vars.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "::error::Repository variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set."
+            exit 1
+          fi
+          case "${{ vars.VITE_SUPABASE_ANON_KEY }}" in
+            sb_secret_*) echo "::error::VITE_SUPABASE_ANON_KEY must be the publishable key, never a secret key."; exit 1 ;;
+          esac
       - name: Build
         run: npm run build
         env:
           # Project site: https://akifadnan2003.github.io/speak-lab/
           VITE_BASE_PATH: /speak-lab/
-          # M1 ONLY: renders UI shells with demo data and a fake local session.
-          # Remove this line in M2 when Supabase authentication is connected.
-          VITE_UI_PREVIEW: 'true'
-          # M2: provide these as repository *variables* (public anon key only).
+          # Public values only (publishable key). The build refuses VITE_UI_PREVIEW alongside these.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      - name: Verify no secret key reached the bundle
+        run: |
+          if grep -rq "sb_secret_" dist/assets; then echo "::error::secret key found in bundle"; exit 1; fi
       - name: Add SPA fallbacks
         run: |
           cp dist/index.html dist/404.html

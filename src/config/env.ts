@@ -3,11 +3,14 @@ import { z } from 'zod'
 /**
  * Runtime configuration parsed once from `import.meta.env`.
  *
- * - Supabase values are optional at M1 because authentication is not wired yet.
- *   When they are absent the app runs in "unconfigured" mode: protected routes
- *   fail closed and the login screen explains that auth is not connected.
- * - `uiPreview` is a build-time switch for M1 only. It enables a fake local
- *   session so the UI shells can be reviewed with clearly-labelled demo data.
+ * - Supabase values are the public project URL and the *publishable* (anon) key only. Both are
+ *   safe in the bundle: every table is protected by Row Level Security and privileged work runs
+ *   in Edge Functions with server-side secrets.
+ * - When Supabase values are absent the app runs in "unconfigured" mode: protected routes fail
+ *   closed and the login screen explains that auth is not connected.
+ * - `uiPreview` is a development/test-only switch that renders the screens with a fake local
+ *   session over labelled demo data. It is refused whenever Supabase is configured, so a real
+ *   build can never show simulated access (see docs/SECURITY.md).
  */
 const envSchema = z.object({
   VITE_SUPABASE_URL: z.union([z.url(), z.literal('')]).optional(),
@@ -37,11 +40,16 @@ export function parseEnv(raw: Record<string, string | undefined>, isDev: boolean
   }
   const supabaseUrl = data.VITE_SUPABASE_URL ? data.VITE_SUPABASE_URL : null
   const supabaseAnonKey = data.VITE_SUPABASE_ANON_KEY ? data.VITE_SUPABASE_ANON_KEY : null
+  const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+  const previewRequested = truthy(data.VITE_UI_PREVIEW)
+  if (previewRequested && supabaseConfigured) {
+    console.warn('[speaklab] VITE_UI_PREVIEW is ignored because Supabase is configured.')
+  }
   return {
     supabaseUrl,
     supabaseAnonKey,
-    supabaseConfigured: Boolean(supabaseUrl && supabaseAnonKey),
-    uiPreview: truthy(data.VITE_UI_PREVIEW),
+    supabaseConfigured,
+    uiPreview: previewRequested && !supabaseConfigured,
     basePath: data.VITE_BASE_PATH || '/speak-lab/',
     isDev,
   }

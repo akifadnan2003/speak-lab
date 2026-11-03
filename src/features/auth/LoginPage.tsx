@@ -1,13 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ShieldAlert } from 'lucide-react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Field, FieldError, Label } from '@/components/ui/label'
 import { env } from '@/config/env'
+import { getSupabaseClient } from '@/lib/supabase/client'
+import { describeAuthError } from './auth-errors'
 import { useAuth } from './AuthProvider'
 
 const schema = z.object({
@@ -19,19 +22,32 @@ type FormValues = z.infer<typeof schema>
 
 export function LoginPage() {
   const { state } = useAuth()
+  const location = useLocation()
   const unconfigured = state.status === 'unauthenticated' && state.reason === 'unconfigured'
   const canSubmit = env.supabaseConfigured
+  const [busy, setBusy] = useState(false)
+  const notice = (location.state as { notice?: string } | null)?.notice
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
   })
 
-  const onSubmit = form.handleSubmit(() => {
-    // M2: signInWithPassword via Supabase. Until then the form validates only.
-    form.setError('root', {
-      message: 'Sign-in is not connected yet. Authentication arrives in milestone M2.',
-    })
+  const onSubmit = form.handleSubmit(async ({ email, password }) => {
+    const client = getSupabaseClient()
+    if (!client) {
+      form.setError('root', { message: 'Sign-in is not available: authentication is not configured in this build.' })
+      return
+    }
+    setBusy(true)
+    const { error } = await client.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
+    setBusy(false)
+    if (error) {
+      form.setError('root', { message: describeAuthError(error) })
+      form.resetField('password')
+      return
+    }
+    // The auth listener updates the context; <RedirectIfAuthenticated> then sends the user home.
   })
 
   return (
@@ -50,9 +66,14 @@ export function LoginPage() {
             <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
             <p>
               Authentication is not configured in this build. Protected areas stay locked until the
-              Supabase project is connected (milestone M2).
+              Supabase project is connected.
             </p>
           </div>
+        ) : null}
+        {notice ? (
+          <p role="status" className="mb-5 rounded-lg bg-success-soft p-3 text-sm text-success-soft-fg">
+            {notice}
+          </p>
         ) : null}
         <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
           <Field>
@@ -85,7 +106,7 @@ export function LoginPage() {
             <FieldError>{form.formState.errors.password?.message}</FieldError>
           </Field>
           <FieldError>{form.formState.errors.root?.message}</FieldError>
-          <Button type="submit" size="lg" className="mt-1 w-full" disabled={!canSubmit && !env.uiPreview}>
+          <Button type="submit" size="lg" className="mt-1 w-full" disabled={!canSubmit && !env.uiPreview} loading={busy}>
             Sign in
           </Button>
         </form>
