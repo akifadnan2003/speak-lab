@@ -9,15 +9,17 @@ import type { UserRole } from './types'
  * Redirect that re-fires on every location change. React Router's built-in redirect component
  * only re-runs its effect when the *target* changes, so a guard element that stays mounted across
  * two quick navigations (e.g. /tutor then /tutor/students/x) would silently stop redirecting and
- * leave a blank screen at the protected URL. Keying on `location.key` closes that gap.
+ * leave a blank screen at the protected URL. Keying on the pathname closes that gap.
  */
 export function Redirect({ to }: { to: string }) {
   const navigate = useNavigate()
-  const { key } = useLocation()
+  // `location.key` is "default" for browser-initiated hash navigations, so the pathname is the
+  // dependency that actually changes between two protected URLs.
+  const { pathname } = useLocation()
   useEffect(() => {
     navigate(to, { replace: true })
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- `key` is the intended trigger
-  }, [navigate, to, key])
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- `pathname` is the intended trigger
+  }, [navigate, to, pathname])
   return null
 }
 
