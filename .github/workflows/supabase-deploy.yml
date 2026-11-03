@@ -4,10 +4,14 @@ name: Supabase backend (manual)
 # Actions tab (or `gh workflow run supabase-deploy.yml`). It is additive only: `supabase db push`
 # applies migrations that the hosted project has not seen yet and refuses anything else.
 #
+# Supabase CLI 3.x targets the LOCAL stack by default, so every database command below passes
+# `--remote` (the linked hosted project) and the database password explicitly. Nothing here ever
+# starts a local stack.
+#
 # Required repository secrets (least privilege, never exposed to the frontend build):
 #   SUPABASE_ACCESS_TOKEN  personal access token used by the CLI
 #   SUPABASE_PROJECT_REF   the project ref (subdomain of the project URL)
-#   SUPABASE_DB_PASSWORD   database password (used only for `db push`)
+#   SUPABASE_DB_PASSWORD   database password (used only by `migration list --remote` and `db push --remote`)
 
 on:
   workflow_dispatch:
@@ -46,14 +50,14 @@ jobs:
           version: latest
       - name: Link project
         run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
-      - name: Pending migrations
-        run: supabase migration list
-      - name: Apply migrations (additive)
+      - name: Pending migrations (hosted project)
+        run: supabase migration list --remote --password "$SUPABASE_DB_PASSWORD"
+      - name: Apply migrations (additive, hosted project)
         if: ${{ inputs.migrations && !inputs.dry_run }}
-        run: supabase db push
-      - name: Migrations dry run
+        run: supabase db push --remote --password "$SUPABASE_DB_PASSWORD"
+      - name: Migrations dry run (hosted project)
         if: ${{ inputs.migrations && inputs.dry_run }}
-        run: supabase db push --dry-run
+        run: supabase db push --remote --dry-run --password "$SUPABASE_DB_PASSWORD"
       - name: Deploy Edge Functions
         if: ${{ inputs.functions && !inputs.dry_run }}
         run: supabase functions deploy student-admin --no-verify-jwt
@@ -63,5 +67,5 @@ jobs:
           supabase secrets set \
             SPEAKLAB_ALLOWED_APP_URLS="https://akifadnan2003.github.io/speak-lab/,http://localhost:5173/speak-lab/" \
             SPEAKLAB_INVITE_TTL_SECONDS="3600"
-      - name: Migration state after deploy
-        run: supabase migration list
+      - name: Migration state after deploy (hosted project)
+        run: supabase migration list --remote --password "$SUPABASE_DB_PASSWORD"

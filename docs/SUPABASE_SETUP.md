@@ -74,8 +74,9 @@ Backend changes are never applied by a frontend push. Use the manual workflow:
 1. GitHub → Actions → **Supabase backend (manual)** → *Run workflow* (or
    `gh workflow run supabase-deploy.yml`).
 2. Leave *migrations* and *functions* ticked. Tick *dry run* first if you want to see the plan.
-3. The job links the project with the secrets, prints `supabase migration list`, runs
-   `supabase db push` (additive: only migrations the project has not applied yet), deploys the
+3. The job links the project with the secrets, prints `supabase migration list --remote`, runs
+   `supabase db push --remote` (additive: only migrations the project has not applied yet;
+   CLI 3.x targets the local stack unless `--remote` is given), deploys the
    `student-admin` function with `--no-verify-jwt` (the function verifies callers itself), and
    sets the function secrets `SPEAKLAB_ALLOWED_APP_URLS` and `SPEAKLAB_INVITE_TTL_SECONDS`.
 
