@@ -12,6 +12,12 @@ import { VitePWA } from 'vite-plugin-pwa'
  */
 const BASE_PATH = process.env.VITE_BASE_PATH ?? '/speak-lab/'
 
+// A build must never combine the demo preview session with a real backend. `config/env.ts`
+// also refuses it at runtime; failing the build makes the mistake impossible to deploy.
+if ((process.env.VITE_UI_PREVIEW === 'true' || process.env.VITE_UI_PREVIEW === '1') && process.env.VITE_SUPABASE_URL) {
+  throw new Error('VITE_UI_PREVIEW cannot be enabled when VITE_SUPABASE_URL is set. Preview mode is for builds without a backend only.')
+}
+
 export default defineConfig({
   base: BASE_PATH,
   plugins: [

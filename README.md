@@ -4,12 +4,14 @@ A premium, mobile-first, AI-powered English academy. Invitation-only, speaking-f
 tutor and their students.
 
 **Production:** https://akifadnan2003.github.io/speak-lab/
-**Status:** Milestone M1 complete (application foundation and design system). See
+**Status:** Milestone M2 complete (authentication, authorization, invitations). See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-> The deployed site currently runs in **preview mode**: every screen renders with clearly-labelled
-> demo data and a fake local session so the UI can be reviewed. Authentication, analytics and AI are
-> not connected yet. Protected routes fail closed when preview mode is off.
+> The deployed site uses real Supabase authentication. There is no public sign-up: the tutor
+> invites students by email, and every table is protected by Row Level Security. Lessons,
+> vocabulary and progress screens still show clearly-labelled sample content until M3–M5.
+> Owner setup steps (email templates, backend deployment, owner bootstrap) are in
+> [`docs/SUPABASE_SETUP.md`](docs/SUPABASE_SETUP.md).
 
 ## Stack
 
@@ -22,11 +24,13 @@ GitHub Actions → GitHub Pages.
 
 ```bash
 npm install
-cp .env.example .env.local        # fill in later milestones; never commit secrets
+cp .env.example .env.local        # local Supabase values from `npx supabase status`; never commit secrets
+npx supabase start                # local Postgres/Auth/Edge Functions/Mailpit (needs Docker)
 npm run dev                       # http://localhost:5173/speak-lab/
 ```
 
-To review the UI shells locally, set `VITE_UI_PREVIEW=true` in `.env.local`.
+To review the UI shells without a backend, leave the Supabase values empty and set
+`VITE_UI_PREVIEW=true` in `.env.local` (preview is refused whenever Supabase is configured).
 
 | Command | Purpose |
 | --- | --- |
@@ -34,7 +38,9 @@ To review the UI shells locally, set `VITE_UI_PREVIEW=true` in `.env.local`.
 | `npm run typecheck` | `tsc -b` with strict settings |
 | `npm run lint` | oxlint |
 | `npm run test` | Vitest unit and integration tests |
-| `npm run test:e2e` | Playwright (builds and serves the production bundle) |
+| `npm run test:e2e` | Playwright shell suite (preview build) |
+| `npm run test:db` | Authorization / lifecycle tests against the local Supabase stack |
+| `npm run test:e2e:auth` | Real invitation, recovery and disable flows in the browser (local stack) |
 | `npm run build` | Production build into `dist/` |
 | `npm run preview` | Serve `dist/` locally under `/speak-lab/` |
 | `npm run check` | typecheck + lint + test + build |
@@ -49,12 +55,13 @@ src/
   app/            App providers, router, PWA hooks
   components/     ui/ (primitives), layout/ (shell), theme/, feedback/
   config/         Validated environment access
-  demo/           Clearly-labelled demonstration data (M1 only)
+  demo/           Clearly-labelled demonstration data (preview mode and placeholders)
   features/       auth, dashboard, learn, lesson, speak, vocabulary, progress, tutor, settings
   lib/            Utilities and the Supabase client factory
   styles/         Design tokens and global CSS
   test/           Vitest setup
-e2e/              Playwright specs
+e2e/              Playwright specs (shell.spec.ts, auth.spec.ts)
+supabase/         config.toml, migrations/, functions/student-admin, templates/, tests/
 docs/             Product, architecture, curriculum, design, security, roadmap, decisions, testing
 .github/          CI and GitHub Pages deployment
 ```

@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, MailCheck } from 'lucide-react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
 import { z } from 'zod'
@@ -8,19 +9,58 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Field, FieldError, Label } from '@/components/ui/label'
 import { env } from '@/config/env'
+import { getSupabaseClient } from '@/lib/supabase/client'
+import { describeAuthError } from './auth-errors'
+import { appRedirectUrl } from './auth-url'
 
 const schema = z.object({ email: z.email('Enter a valid email address') })
 type FormValues = z.infer<typeof schema>
 
 export function ForgotPasswordPage() {
+  const [sent, setSent] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '' } })
 
-  const onSubmit = form.handleSubmit(() => {
-    // M2: resetPasswordForEmail via Supabase with the GitHub Pages redirect URL.
-    form.setError('root', {
-      message: 'Password recovery is not connected yet. It arrives with authentication in M2.',
-    })
+  const onSubmit = form.handleSubmit(async ({ email }) => {
+    const client = getSupabaseClient()
+    if (!client) {
+      form.setError('root', { message: 'Password recovery is not available: authentication is not configured in this build.' })
+      return
+    }
+    setBusy(true)
+    const normalised = email.trim().toLowerCase()
+    const { error } = await client.auth.resetPasswordForEmail(normalised, { redirectTo: appRedirectUrl(env.basePath) })
+    setBusy(false)
+    if (error) {
+      form.setError('root', { message: describeAuthError(error) })
+      return
+    }
+    setSent(normalised)
   })
+
+  if (sent) {
+    return (
+      <Card className="shadow-md">
+        <CardHeader>
+          <span className="mb-1 flex size-10 items-center justify-center rounded-full bg-success-soft text-success-soft-fg">
+            <MailCheck className="size-5" aria-hidden />
+          </span>
+          <CardTitle className="text-xl">Check your email</CardTitle>
+          <CardDescription>
+            If an account exists for <strong>{sent}</strong>, a reset link is on its way. The link works once and expires
+            soon.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline" className="w-full">
+            <Link to="/login">
+              <ArrowLeft aria-hidden /> Back to sign in
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="shadow-md">
@@ -45,7 +85,7 @@ export function ForgotPasswordPage() {
             <FieldError>{form.formState.errors.email?.message}</FieldError>
           </Field>
           <FieldError>{form.formState.errors.root?.message}</FieldError>
-          <Button type="submit" size="lg" className="w-full" disabled={!env.supabaseConfigured && !env.uiPreview}>
+          <Button type="submit" size="lg" className="w-full" disabled={!env.supabaseConfigured && !env.uiPreview} loading={busy}>
             Send reset link
           </Button>
         </form>

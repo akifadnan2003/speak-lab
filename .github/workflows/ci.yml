@@ -34,7 +34,7 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: End-to-end (Playwright)
+    name: End-to-end shell (Playwright, preview build)
     runs-on: ubuntu-latest
     needs: verify
     timeout-minutes: 20
@@ -55,3 +55,53 @@ jobs:
           name: playwright-report
           path: playwright-report
           retention-days: 7
+
+  database:
+    name: Database policies, Edge Function and real-auth e2e (local Supabase)
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start local Supabase (applies supabase/migrations, serves Edge Functions, captures email)
+        run: supabase start -x studio,imgproxy,logflare,vector
+      - name: Export local credentials for the tests
+        run: |
+          supabase status -o json > /tmp/status.json
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync("/tmp/status.json", "utf8"));
+            const pick = (...k) => k.map((x) => s[x]).find(Boolean) ?? "";
+            const out = {
+              SUPABASE_URL: pick("API_URL"),
+              SUPABASE_ANON_KEY: pick("ANON_KEY", "PUBLISHABLE_KEY"),
+              SUPABASE_SERVICE_ROLE_KEY: pick("SERVICE_ROLE_KEY", "SECRET_KEY"),
+              MAILPIT_URL: pick("MAILPIT_URL", "INBUCKET_URL") || "http://127.0.0.1:54324",
+            };
+            for (const [k, v] of Object.entries(out)) { if (!v) throw new Error("missing " + k); }
+            require("fs").appendFileSync(process.env.GITHUB_ENV, Object.entries(out).map(([k, v]) => `${k}=${v}`).join("\n") + "\n");
+            console.log("::add-mask::" + out.SUPABASE_SERVICE_ROLE_KEY);
+          '
+      - name: Authorization and lifecycle integration tests
+        run: npm run test:db
+      - run: npx playwright install --with-deps chromium
+      - name: Real-auth end-to-end (invite, recovery, disable, logout, refresh)
+        run: npm run test:e2e:auth
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-auth
+          path: playwright-report-auth
+          retention-days: 7
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

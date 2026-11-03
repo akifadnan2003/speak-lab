@@ -1,98 +1,114 @@
 # SpeakLab — Security
 
-Last updated for milestone M1 (2026-11-03). Enforcement arrives in M2; this document states the
-model the code must satisfy and what exists today.
+Last updated for milestone M2 (2026-11-03). This document states the model and what is enforced
+today. Operational steps live in `docs/SUPABASE_SETUP.md`.
 
 ## 1. Threat model summary
 
-Assets: student personal data, learning history, private recordings, tutor notes, AI provider
-budget. Adversaries: an uninvited visitor, a student trying to see another student or elevate
-privileges, a leaked anon key, a compromised client bundle, bot abuse of AI endpoints.
+Assets: student personal data, learning history, private recordings (M7), tutor notes, AI
+provider budget. Adversaries: an uninvited visitor, a student trying to see another student or
+elevate privileges, a leaked publishable key, a compromised client bundle, bot abuse of AI
+endpoints, a revoked student with a still-open session.
 
-## 2. Principles
+## 2. Principles and where they are enforced
 
-1. **Invitation only.** Public signups and anonymous sign-ins are disabled in the Supabase Auth
-   settings (configuration, not UI). Accounts are created only by the `invite-student` Edge Function
-   using `auth.admin.inviteUserByEmail` after verifying the caller is the tutor.
-2. **One tutor.** `profiles.role = 'tutor'` is assigned by the owner bootstrap only. No endpoint can
-   grant it. RLS and a trigger reject client-side changes to `role`, `status` and tutor links.
-3. **Fail closed.** Unknown or missing session → login. Missing config → login with explanation.
-   Disabled account → blocked at policy level and signed out.
-4. **Least privilege keys.** Browser ships only the anon key; its power is bounded by RLS. Service
-   role and AI keys live in Edge Function secrets.
-5. **Validate everything.** Zod on the client and in every Edge Function.
-6. **Audit the lifecycle.** Invitations, status changes and role bootstrap are recorded in
-   `account_events` without storing secrets or tokens.
+| Principle | Enforcement |
+| --- | --- |
+| Invitation only | Supabase Auth: sign-ups and anonymous sign-ins disabled (verified against the hosted project). Accounts are created only by `auth.admin.inviteUserByEmail` inside the `student-admin` Edge Function after the caller is verified as the tutor. |
+| Exactly one tutor | `profiles.role` is written only by `bootstrap_owner()` (service role / SQL editor) and never by clients. Partial unique index `profiles_single_tutor_idx` forbids a second tutor row for anyone. |
+| No self-promotion | Column-level grants exclude `role`, `status`, `email`, `id` from client updates; a `BEFORE UPDATE` trigger rejects any such change arriving with a client JWT. `bootstrap_owner` is not executable by `anon`/`authenticated`. |
+| Students see only their data | RLS on every table. `profiles`: own row, or tutor ↔ linked student. `tutor_students`: participants. `invitations`: tutor only. `account_events`: own rows or tutor for linked students. |
+| Fail closed | No session → `/login`. Session without a readable profile → error screen with sign-out. Missing Supabase config → login only, sign-in disabled. Preview mode refused at build and runtime when Supabase is configured. |
+| Least-privilege keys | Browser ships only the publishable key. The secret key exists only in Edge Function secrets injected by Supabase; the deploy workflow fails if a secret key is found in the bundle or in the public variable. |
+| Validate everything | Zod on the client and in the Edge Function; database `CHECK` constraints; email normalised to lowercase. |
+| Audit the lifecycle | `account_events`: account created, invitation sent/resent/revoked/accepted, disabled/reactivated, owner bootstrapped. No tokens or secrets are stored. |
+| Revocation is server-side | Disable = `status = 'disabled'` + Auth ban. RLS denies immediately; refresh and sign-in are refused. Not merely a local sign-out. |
 
-## 3. Owner bootstrap (M2)
+## 3. Authorization rules (as implemented in `supabase/migrations/20261103120000_identity_and_access.sql`)
 
-Documented, repeatable, no hardcoded email as the sole check:
+Helper functions (`SECURITY DEFINER`, `STABLE`, `search_path = ''`, executable by
+`authenticated`/`service_role` only): `is_tutor()`, `is_active()`, `current_account_status()`,
+`request_is_client()`.
 
-1. The owner signs in once with a Supabase-created user (dashboard invite or magic link).
-2. A migration creates `profiles` and the `is_tutor()` helper, with no tutor rows.
-3. A one-time `bootstrap-owner` Edge Function, protected by a deploy-time secret
-   (`BOOTSTRAP_SECRET`) **and** the invariant "no tutor exists yet", promotes the caller's verified
-   `auth.uid()` to `tutor`. The function is removed (or the secret rotated out) after use.
-4. Alternative: a migration that inserts the tutor row for a specific, verified Auth user id
-   supplied as a migration variable. Either way the authorization check is the Auth user id, not an
-   email string.
+| Table | SELECT | UPDATE | INSERT / DELETE |
+| --- | --- | --- | --- |
+| `profiles` | own row (any status); tutor → students linked in `tutor_students` | own row when active; only `full_name`, `preferred_language`, `support_language`, `preferences`, `onboarding_completed_at` | never from clients |
+| `tutor_students` | active participants (tutor or the student) | never | never (trigger on invitation acceptance) |
+| `invitations` | active tutor, own invitations | never | never (Edge Function with service role) |
+| `account_events` | active user: own rows; tutor: linked students and invitees | never | never (triggers / function) |
 
-## 4. Row Level Security (M2)
+`bootstrap_owner(uuid)`: refuses client callers, requires an existing **confirmed** Auth user,
+returns `already-owner` for the existing tutor, raises for any other id when a tutor exists.
+`complete_onboarding()`: `SECURITY INVOKER`, sets the timestamp once for `auth.uid()`.
 
-- Every student-scoped table: `ENABLE ROW LEVEL SECURITY`, no default grants.
-- Student policies: `student_id = auth.uid() AND is_active(auth.uid())`.
-- Tutor policies: `is_tutor() AND EXISTS (tutor_students link)`.
-- Teacher-only tables: tutor policies only.
-- `profiles`: users read their own row; tutor reads assigned students; updates limited to
-  non-sensitive columns through a `BEFORE UPDATE` trigger that rejects changes to `role`, `status`,
-  `tutor_id` unless the session is service role.
-- Storage: recordings bucket is private; object paths are prefixed with the student id and
-  policies mirror the table rules. Retention and deletion are student-initiated or tutor-initiated
-  and logged.
+Triggers on `auth.users` (owned by `postgres`, `SECURITY DEFINER`, locked `search_path`): create
+the profile on insert (status `invited`, or `active` if created pre-confirmed); on first email
+confirmation set `active`, mark the invitation accepted, create the `tutor_students` link, log the
+event; keep `profiles.email` in sync.
 
-## 5. Required authorization tests (M2)
+## 4. Edge Function `student-admin`
 
-Executed against a test database in CI with per-role JWTs:
+- `verify_jwt = false` at the gateway; the function authenticates the caller itself with
+  `auth.getUser()` (validated by the Auth server) and then checks the tutor role **in the
+  database** with the service client. Client-supplied role claims, metadata or emails are never
+  used for authorization.
+- Actions: `invite`, `resend`, `revoke`, `set_status`. Input validated with Zod; errors are
+  returned as `{ ok: false, error: { code, message } }` with meaningful messages and no stack
+  traces.
+- `redirectTo` is accepted only from an allow-list (`SPEAKLAB_ALLOWED_APP_URLS`); Supabase applies
+  its own redirect allow-list on top.
+- Secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` /
+  `SUPABASE_SECRET_KEYS` are injected by the platform. Nothing is read from the request.
 
-- A student cannot read another student's progress.
-- A student cannot access tutor-only data (notes, invitations, usage).
-- A student cannot grant themselves tutor privileges (role update rejected).
-- Unauthenticated visitors cannot read private information.
-- Unauthorized users cannot create invitations.
-- A disabled student cannot continue accessing protected resources.
-- The authorized tutor can access their students' progress.
+## 5. Authentication flow on GitHub Pages
 
-## 6. Authentication flow on GitHub Pages (M2)
+- Email templates link straight to the app with `token_hash` (ADR-009). `captureAuthRedirect()`
+  runs before React mounts, keeps the material in memory, and rewrites the address bar to
+  `#/auth/callback?flow=invite|recovery`, so tokens never stay in history, bookmarks or logs.
+- Supported inputs: `?token_hash&type` (templates), `?code` (PKCE), `#access_token…` (implicit
+  fallback), and provider errors. Processing happens in `AuthProvider` with `verifyOtp`,
+  `exchangeCodeForSession` or `setSession`; `detectSessionInUrl` is off to avoid a race with the
+  router.
+- Sessions persist in `localStorage` (`speaklab.auth`), refresh tokens rotate; `signOut()` uses the
+  global scope (server-side revocation) and falls back to local sign-out when offline.
+- The own profile is re-read every 60 s and on focus so a disabled account is surfaced quickly;
+  RLS already blocks data access regardless.
 
-- `flowType: 'pkce'`, `detectSessionInUrl: true`, storage key `speaklab.auth`.
-- Site URL and Redirect URL: `https://akifadnan2003.github.io/speak-lab/`. Query parameters from
-  Supabase (`?code=`) arrive before the hash and are consumed by supabase-js; the app then routes
-  to `#/auth/callback` to finish (set password for invites, new password for recovery).
-- Email templates use the provider defaults. Expiration is whatever Supabase enforces (configurable
-  in the dashboard); the UI reports what the provider reports and does not invent policies.
-- Sessions persist in `localStorage`; refresh tokens rotate; sign-out revokes.
+## 6. Known limitations (M2)
+
+1. **Access-token window.** A JWT already issued before a disable or sign-out stays
+   cryptographically valid until it expires (default 1 h). It cannot read data (RLS checks
+   `profiles.status`) and cannot be refreshed, but it still authenticates to the Auth server for
+   that window. Mitigation: shorter JWT expiry in the dashboard (recommended 600 s).
+2. **Email deliverability** uses Supabase's built-in sender with its rate limits. Custom SMTP is
+   recommended before inviting more than a handful of students.
+3. **No MFA** for the tutor account yet. Recommended for M9 (TOTP via Supabase MFA).
+4. **CORS** on the Edge Function is `*`; authentication is bearer-token based, not cookie based, so
+   this does not enable cross-site request forgery.
+5. **Recovery before onboarding.** A student who abandons onboarding after verifying the invitation
+   has a session but no password; they can still use *Forgot password*. Onboarding resumes on the
+   next visit.
 
 ## 7. AI endpoints (M7)
 
 - Browser never calls providers directly. Edge Functions authenticate the caller, check role and
   `ai_quotas`, call the provider, store usage and cost in `ai_usage`.
-- Rate limiting per user and per IP at the function level; daily minute/token caps configurable by
-  the tutor.
+- Rate limiting per user and per IP at the function level; daily caps configurable by the tutor.
 - Prompts never include other students' data.
 
 ## 8. Client hardening
 
-- No secrets in the bundle (`.env.example` lists public names only; `.env*` ignored).
-- Service worker precaches only the app shell; `runtimeCaching` is empty so private data,
-  recordings and API responses are never stored by the SW.
+- No secrets in the bundle (`.env.example` lists public names only; `.env*` ignored; deploy
+  workflow greps the bundle for `sb_secret_`).
+- Service worker precaches only the app shell; `runtimeCaching` is empty so private data is never
+  stored by the SW. Auth tokens live in `localStorage`, not in the SW cache.
 - Content is rendered through React (escaped); no `dangerouslySetInnerHTML`.
-- Error boundary avoids leaking stack traces to the UI.
-- Dependencies: `npm audit` is reviewed each milestone. Current advisories are confined to
-  build-time transitive dependencies of `vite-plugin-pwa`/`workbox-build` (deepmerge, glob,
-  minimatch) and do not ship to the browser.
+- Error boundary avoids leaking stack traces; auth errors are mapped to neutral messages.
+- Dependencies: `npm audit` reviewed each milestone. Remaining advisories are confined to
+  build-time transitive dependencies of `vite-plugin-pwa`/`workbox-build` and do not ship.
 
-## 9. Preview mode caveat (M1)
+## 9. Preview mode
 
-`VITE_UI_PREVIEW=true` creates a fake local session over demo data. It exposes no real data and
-no backend, and it is removed from the deployment workflow in M2. It must never be enabled in a
-build that has Supabase credentials.
+`VITE_UI_PREVIEW=true` creates a fake local session over labelled demo data. It is refused by
+`config/env.ts` whenever Supabase is configured and the build throws if both are set. It is used
+only by the shell e2e suite and local reviews, never by the deploy workflow.
