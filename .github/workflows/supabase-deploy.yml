@@ -56,15 +56,29 @@ jobs:
         with:
           version: latest
       - name: Check the database connection secret (value is never printed)
+        # Parsed with a real URL parser, not a pattern match, so the host that will actually be
+        # dialled is the one being checked (a query string or userinfo cannot smuggle a host).
         run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::error::Repository secret SUPABASE_DB_URL is missing. Copy the Session pooler string from Dashboard > Connect."
-            exit 1
-          fi
-          case "$SUPABASE_DB_URL" in
-            postgresql://postgres.${SUPABASE_PROJECT_REF}:*@*.pooler.supabase.com:5432/postgres) echo "Session pooler URL for the linked project: OK" ;;
-            *) echo "::error::SUPABASE_DB_URL must be the Session pooler string for project $SUPABASE_PROJECT_REF (postgresql://postgres.<ref>:<password>@<host>.pooler.supabase.com:5432/postgres)."; exit 1 ;;
-          esac
+          python3 - <<'PY'
+          import os, sys, urllib.parse as u
+          url = os.environ.get('SUPABASE_DB_URL', '')
+          ref = os.environ.get('SUPABASE_PROJECT_REF', '')
+          if not url:
+              print('::error::Repository secret SUPABASE_DB_URL is missing. Copy the Session pooler string from Dashboard > Connect.')
+              sys.exit(1)
+          p = u.urlparse(url)
+          problems = []
+          if p.scheme not in ('postgresql', 'postgres'): problems.append('scheme must be postgresql://')
+          if p.username != f'postgres.{ref}': problems.append('user must be postgres.<project ref> for the linked project')
+          if not (p.hostname or '').endswith('.pooler.supabase.com'): problems.append('host must be the Session pooler (*.pooler.supabase.com)')
+          if p.port != 5432: problems.append('port must be 5432 (Session pooler, not Transaction pooler)')
+          if p.path != '/postgres' or p.query or p.fragment or p.params: problems.append('path must be /postgres with no query string')
+          if not p.password: problems.append('password is missing')
+          if problems:
+              print('::error::SUPABASE_DB_URL is not the Session pooler string for this project: ' + '; '.join(problems))
+              sys.exit(1)
+          print('Session pooler URL for the linked project: OK')
+          PY
       - name: Link project
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
       - name: Pending migrations (hosted project via Session pooler)
