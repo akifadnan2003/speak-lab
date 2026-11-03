@@ -231,7 +231,7 @@ begin
     lower(new.email),
     left(v_full_name, 120),
     'student',
-    case when new.email_confirmed_at is not null then 'active' else 'invited' end,
+    (case when new.email_confirmed_at is not null then 'active' else 'invited' end)::public.account_status,
     v_support
   )
   on conflict (id) do nothing;
