@@ -36,6 +36,7 @@ caller's JWT and role before using the service-role key.
 | `src/config/env.ts` | Zod-validated `import.meta.env`. Exposes `supabaseConfigured`, `uiPreview` (refused when configured), `basePath`. |
 | `src/lib/supabase/client.ts` | Lazy `createClient` with the publishable key, PKCE, persisted session, `detectSessionInUrl: false`. Returns `null` when unconfigured. `database.types.ts` holds the row shapes the client may see. |
 | `src/features/auth/` | `auth-url.ts` (link capture/scrub), `AuthProvider` (session listener + profile query), `guards.tsx` (`RequireAuth`, `RequireOnboarded`, `RequireRole`, `RedirectIfAuthenticated`), `profile.ts`, `profile-mutations.ts`, `auth-errors.ts`, screens: login, forgot password, callback, welcome (onboarding), reset password, account disabled. |
+| `src/lib/local-data.ts` | Registry and purge of student-local data (storage keys, IndexedDB, feature cleaners). Used by the auth provider on sign-out, SIGNED_OUT and account switch. |
 | `src/features/tutor/api.ts` | Queries for students / invitations / events and the `student-admin` function call (`callStudentAdmin`). Demo fixtures only in preview mode. |
 | `src/features/*` | One folder per product area; pages import demo data today and queries tomorrow. |
 | `src/components/ui/` | Accessible primitives (Radix + cva): button, card, badge, input, label, dialog, sheet, tabs, progress (+ ring), switch, avatar, skeleton, tooltip, dropdown-menu, select, separator, empty-state, page-header, stat. |

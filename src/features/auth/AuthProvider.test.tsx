@@ -114,6 +114,8 @@ describe('SupabaseAuthProvider', () => {
     fake.listeners = []
     fake.profiles = new Map()
     fake.profileError = null
+    localStorage.clear()
+    sessionStorage.clear()
     fake.verifyOtp.mockReset()
     fake.signOut.mockReset().mockResolvedValue({ error: null })
     const { setPendingAuthRedirectForTests } = await import('./auth-url')
@@ -145,6 +147,29 @@ describe('SupabaseAuthProvider', () => {
     fake.session = { user: { id: 'ghost' } }
     await renderProvider()
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('error'))
+  })
+
+  it('purges student-local data when a different account signs in on the same device', async () => {
+    localStorage.setItem('speaklab.active-user', 'previous-student')
+    localStorage.setItem('speaklab.progress.lesson-1', 'previous-student-data')
+    fake.session = { user: { id: 'u1' } }
+    fake.profiles.set('u1', makeProfile())
+    await renderProvider()
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'))
+    expect(localStorage.getItem('speaklab.progress.lesson-1')).toBeNull()
+    expect(localStorage.getItem('speaklab.active-user')).toBe('u1')
+  })
+
+  it('clears student-local data and caches on SIGNED_OUT', async () => {
+    fake.session = { user: { id: 'u1' } }
+    fake.profiles.set('u1', makeProfile())
+    await renderProvider()
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'))
+    localStorage.setItem('speaklab.progress.lesson-1', 'data')
+    fake.emit('SIGNED_OUT', null)
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'))
+    await waitFor(() => expect(localStorage.getItem('speaklab.progress.lesson-1')).toBeNull())
+    expect(localStorage.getItem('speaklab.active-user')).toBeNull()
   })
 
   it('becomes unauthenticated when the session is revoked or expires (SIGNED_OUT)', async () => {

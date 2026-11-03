@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { env } from '@/config/env'
 import { PREVIEW_USERS } from '@/demo/preview-users'
+import { activateLocalUser, clearLocalStudentData, deactivateLocalUser } from '@/lib/local-data'
 import { getSupabaseClient, type AppSupabaseClient } from '@/lib/supabase/client'
 import { authErrorCode, describeAuthError } from './auth-errors'
 import { consumeAuthRedirect, type AuthRedirect } from './auth-url'
@@ -77,7 +78,9 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return
       setSession(next)
       if (event === 'SIGNED_OUT') {
-        queryClient.removeQueries({ queryKey: PROFILE_QUERY_KEY })
+        // Session revoked, expired or signed out elsewhere: nothing of the student stays on the device.
+        queryClient.clear()
+        void clearLocalStudentData().then(deactivateLocalUser)
       }
     })
 
@@ -103,10 +106,27 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
 
   const userId = session?.user.id ?? null
 
+  // Shared devices: before anything is read for a user, make sure no data from a *different*
+  // previous account remains on the device. The profile query waits for this scoping step.
+  const [scopedUserId, setScopedUserId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    void activateLocalUser(userId).then((purged) => {
+      if (cancelled) return
+      if (purged) queryClient.clear()
+      setScopedUserId(userId)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [userId, queryClient])
+  const scoped = userId !== null && scopedUserId === userId
+
   const profileQuery = useQuery({
     queryKey: [...PROFILE_QUERY_KEY, userId],
     queryFn: () => fetchOwnProfile(client!, userId!),
-    enabled: Boolean(client && userId),
+    enabled: Boolean(client && scoped),
     staleTime: 15_000,
     refetchInterval: PROFILE_REFRESH_MS,
     refetchOnWindowFocus: true,
@@ -122,7 +142,10 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       await client.auth.signOut({ scope: 'local' })
     }
     setSession(null)
+    setScopedUserId(null)
     queryClient.clear()
+    await clearLocalStudentData()
+    deactivateLocalUser()
   }, [client, queryClient])
 
   const refreshProfile = useCallback(async () => {
@@ -136,10 +159,11 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     if (flow?.status === 'processing') return { status: 'loading' }
     if (session === undefined) return { status: 'loading' }
     if (session === null) return { status: 'unauthenticated', reason: 'no-session' }
+    if (!scoped) return { status: 'loading' }
     if (profileQuery.data) return { status: 'authenticated', user: profileQuery.data, preview: false }
     if (profileQuery.isError) return { status: 'error', message: describeAuthError(profileQuery.error) }
     return { status: 'loading' }
-  }, [client, flow, session, profileQuery.data, profileQuery.isError, profileQuery.error])
+  }, [client, flow, session, scoped, profileQuery.data, profileQuery.isError, profileQuery.error])
 
   const value = useMemo<AuthContextValue>(
     () => ({ state, flow, clearFlow, signOut, refreshProfile }),
@@ -174,7 +198,10 @@ function PreviewAuthProvider({ children }: { children: ReactNode }) {
     return { status: 'unauthenticated', reason: 'no-session' }
   }, [previewRole, signedOut])
 
-  const signOut = useCallback(async () => setSignedOut(true), [])
+  const signOut = useCallback(async () => {
+    setSignedOut(true)
+    await clearLocalStudentData()
+  }, [])
   const refreshProfile = useCallback(async () => {}, [])
   const clearFlow = useCallback(() => {}, [])
   const previewSwitchRole = useCallback((role: UserRole) => {

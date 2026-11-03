@@ -53,10 +53,11 @@ npm run test:e2e:auth     # e2e/auth.spec.ts (playwright.auth.config.ts); reads 
 
 ## 4. What is covered today
 
-Unit / integration (62 tests): utils, env (incl. preview refusal when configured), theme store,
+Unit / integration (69 tests): utils, env (incl. preview refusal when configured), theme store,
 nav, button/dialog/tabs, router (production fail-closed, preview mode, real-configured routes),
 `auth-url` capture/scrub, `AuthProvider` state machine with a fake client (session, disabled,
-missing profile, SIGNED_OUT, verifyOtp success, expired link).
+missing profile, SIGNED_OUT, verifyOtp success, expired link, local-data purge on sign-out and
+account switch), `lib/local-data` (prefix purge, keep-list, cleaners, shared-device switch).
 
 Shell e2e (32 tests, two projects): unchanged from M1 (manifest, deep links, navigation,
 exercise keyboard use, role isolation, dialogs, theme, overflow at 7 widths).

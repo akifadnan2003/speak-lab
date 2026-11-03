@@ -64,6 +64,18 @@ Owner actions still required (see `docs/SUPABASE_SETUP.md`):
 
 ## M3 — Curriculum and Exercise Engine ⏳
 
+**Integration notes for the standalone M3 work (branch `worktree-m3-curriculum`):**
+
+- Register the localStorage repository's `clearStoredProgress()` with
+  `registerLocalDataCleaner()` from `src/lib/local-data.ts` so sign-out and account switching
+  wipe it (the auth provider already purges every `speaklab.*` key and IndexedDB database).
+- Persist progress, attempts and assessment results to Supabase under the student's own rows
+  (RLS: `student_id = auth.uid()`, tutor read via `tutor_students`); local storage becomes a cache
+  or offline queue with client-generated idempotency keys, never the source of truth.
+- Assessment integrity (retake limits, timing, answer validation) is enforced server-side in that
+  integration; the current localStorage retake record cannot guarantee it.
+- M3 is not merged until M2 is verified independently.
+
 **Correction carried into M3:** the learning journey must start from zero. M3 begins with a
 proper **A0/A1 foundation chapter** (alphabet and sounds, greetings, *to be*, *have got*,
 numbers, present simple basics) before any A2 content. The A2 Past Continuous chapter remains

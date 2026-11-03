@@ -23,6 +23,7 @@ endpoints, a revoked student with a still-open session.
 | Validate everything | Zod on the client and in the Edge Function; database `CHECK` constraints; email normalised to lowercase. |
 | Audit the lifecycle | `account_events`: account created, invitation sent/resent/revoked/accepted, disabled/reactivated, owner bootstrapped. No tokens or secrets are stored. |
 | Revocation is server-side | Disable = `status = 'disabled'` + Auth ban. RLS denies immediately; refresh and sign-in are refused. Not merely a local sign-out. |
+| Nothing of a student stays on a shared device | `src/lib/local-data.ts`: sign-out, the SIGNED_OUT event and a change of the active user id purge every `speaklab.*` storage key except the theme and the auth session, run registered feature cleaners (M3 registers `clearStoredProgress`), delete `speaklab*` IndexedDB databases and clear the TanStack Query cache. The profile query of a new user waits for this purge. |
 
 ## 3. Authorization rules (as implemented in `supabase/migrations/20261103120000_identity_and_access.sql`)
 
@@ -89,6 +90,10 @@ event; keep `profiles.email` in sync.
 5. **Recovery before onboarding.** A student who abandons onboarding after verifying the invitation
    has a session but no password; they can still use *Forgot password*. Onboarding resumes on the
    next visit.
+6. **Assessment integrity is not a client concern.** Any attempt/retake record kept in the browser
+   (M3's localStorage repository) is convenience data only. Placement and assessment results count
+   only once they are written server-side under the student's own RLS-protected rows (M3
+   integration); the server decides what a retake is.
 
 ## 7. AI endpoints (M7)
 

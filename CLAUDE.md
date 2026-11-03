@@ -31,6 +31,9 @@ Supabase operations (setup, bootstrap, deploy, rollback): `docs/SUPABASE_SETUP.m
 - No fake buttons. If a feature is not connected, say so in the UI (`<DemoNotice>`), disable the
   control, or do not render it.
 - Demo data lives only in `src/demo/` and is labelled as such.
+- Anything kept on the device for a student (progress cache, drafts, offline queue) uses a
+  `speaklab.` storage prefix or registers a cleaner in `src/lib/local-data.ts`, so sign-out and
+  account switching purge it.
 
 ## Commands
 
