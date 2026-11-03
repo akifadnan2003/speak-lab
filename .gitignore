@@ -40,3 +40,4 @@ supabase/.temp
 
 supabase/.branches
 playwright-report-auth
+.claude/worktrees
