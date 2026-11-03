@@ -65,9 +65,13 @@ function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   // Email links captured before the router mounted (invitation, recovery, ...).
   const [redirect] = useState<AuthRedirect | null>(() => consumeAuthRedirect())
-  const [flow, setFlow] = useState<AuthFlow | null>(() =>
-    redirect ? { status: 'processing', type: flowTypeOf(redirect) } : null,
-  )
+  const [flow, setFlow] = useState<AuthFlow | null>(() => {
+    if (!redirect) return null
+    if (!client) {
+      return { status: 'error', type: flowTypeOf(redirect), code: 'unconfigured', message: 'Authentication is not configured in this build.' }
+    }
+    return { status: 'processing', type: flowTypeOf(redirect) }
+  })
   const redirectHandled = useRef(false)
 
   useEffect(() => {
