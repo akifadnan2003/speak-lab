@@ -63,13 +63,36 @@ Unit / integration added by M3 (71 tests, total 113):
   with locked assessment, locked lesson refusal, lesson run persisting attempts/progress to
   localStorage, Azerbaijani switch, completed lesson reflected in the chapter view.
 
-End-to-end (34 tests across two projects):
+Unit / integration added by M4 (56 tests, total 171):
+
+- `vocabulary/schema`: defaults, full shape, unknown language/topic rejection, duplicate ids and
+  term+POS, first-example rule with inflections, empty bank.
+- `vocabulary/srs/scheduler`: quality mapping, learning steps and ease growth, mastery only via
+  recall, lapses and ease floor, "hard" cap, spoken counter, determinism; `time`: date keys across
+  UTC / Baku / Los Angeles, overdue-vs-due by zone, calendar day arithmetic.
+- `vocabulary/revision/queue`: bucket order and determinism, single appearance, new-word cap and
+  limit, recently-incorrect window, empty bank, time-zone overdue.
+- `vocabulary/stats`: stage counts, due/overdue, levels, difficult, recent, recommendation, streaks
+  by zone, empty bank.
+- `vocabulary/persistence` + `migration`: memory and localStorage repositories, per-student
+  namespacing, idempotent reviews, clear vs clear-all, corrupted storage, snapshot refuses preview ids.
+- `vocabulary/modes`: bank coverage (≥170 entries, 13 topics, all blankable), registry, `blankOut`,
+  deterministic distractors, each builder graded through the M3 engine.
+- `vocabulary/components`: Flashcard keyboard flip/grade and hidden translation, ActiveRecall hint
+  and reveal, VocabularySession for flashcards / meaning choice / matching / missing word including
+  queue snapshotting mid-session.
+- `vocabulary/VocabularyPage`: zeroed stats for a new student, word browser filters and translation
+  switch, mode list with honest unavailability, practice run persisting under the student id, reset
+  with confirmation, unavailable-mode refusal.
+
+End-to-end (36 tests across two projects):
 
 - Base path, manifest (`start_url`, `scope`, `display`), service worker reachable.
 - Deep hash route direct navigation and refresh (`/learn/a0-01`).
 - Preview banner visible.
 - Student navigation through bottom bar (mobile) / sidebar (desktop).
 - Real lesson exercise operable by keyboard; progress survives navigation; sentence ordering by tap.
+- Vocabulary flashcard session by keyboard; dashboard reflects the review.
 - Student cannot reach `/tutor`.
 - Tutor cards open profile; tab routing; grammar table.
 - Invite dialog validation and Escape.

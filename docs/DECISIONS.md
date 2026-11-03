@@ -99,3 +99,22 @@ becomes its pronunciation lesson (spelling your name) and greetings/jobs its voc
 new A0-04 (adjectives) keeps A0 at eight chapters. `pronunciation` was added as a lesson kind.
 **Consequences.** Learners produce full sentences from the first lesson. `docs/CURRICULUM.md`
 and the map are kept in sync by `curriculum.test.ts`.
+
+## ADR-011 · Vocabulary: SM-2-style scheduler, language-keyed support material, explicit migration (2026-11-03)
+
+**Context.** M4 needs spaced repetition that is explainable and testable, Azerbaijani support that
+does not become mandatory for future languages, and a safe path from device-local progress to
+authenticated server records.
+**Decision.** (1) Scheduling is SM-2 with three documented adaptations (learning steps 1/3/6 days;
+mastery requires three consecutive correct *active recall* answers at a ≥ 21-day interval; lapses
+are counted and demote to learning). Quality 0–5 is derived deterministically from the answer type.
+No optimality is claimed. (2) `VocabularyEntry.translations` is a partial record keyed by
+`SUPPORT_LANGUAGES`; practice shows English first and reveals support material on request.
+(3) Persistence goes through `VocabularyRepository`/`VocabularyBankSource` ports; the localStorage
+implementation is namespaced by student id, `clearStoredVocabulary()` exists for sign-out, and
+`exportVocabularySnapshot()` is the only path to the server: explicit, per-id, idempotent (client
+review ids), and refusing `preview-*` ids. Local records are never re-keyed to another account.
+(4) Four practice modes build M3 `Exercise` objects instead of new components.
+**Consequences.** Review schedules are reproducible in tests, including time-zone cases. The
+Supabase repository is a drop-in. Listening/speaking modes are listed as unavailable until audio
+and the speech pipeline exist.

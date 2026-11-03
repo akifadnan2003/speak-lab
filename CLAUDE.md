@@ -37,6 +37,9 @@ Never claim a check passed without running it. Never delete a meaningful test to
   Exercise grading and progression rules are pure functions in `src/features/exercises/engine/` and
   `src/features/curriculum/progression.ts`; screens talk to persistence only through
   `src/features/curriculum/ports.ts`.
+- Vocabulary follows the same split: entries in `src/features/vocabulary/content/bank.ts` (validated
+  by `schema.ts`), pure scheduler/queue/stats in `srs/`, `revision/`, `stats.ts`, persistence behind
+  `src/features/vocabulary/ports.ts`. Support-language text is optional and keyed by language.
 - UI primitives in `src/components/ui/` follow the shadcn pattern (Radix + `cva` + `cn`).
 - Styling: Tailwind 4 utilities bound to semantic tokens (`bg-surface`, `text-fg-muted`,
   `border-line`, `bg-primary`, status `*-soft` colours). Do not hard-code hex colours in components.
