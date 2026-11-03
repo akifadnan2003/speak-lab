@@ -44,6 +44,25 @@ function writeStore(storage: Storage, studentId: string, store: MemoryStore) {
   }
 }
 
+/**
+ * Remove every device-local progress record. M2's sign-out (and the preview
+ * role switch) should call this so a shared device never shows another
+ * learner's answers.
+ */
+export function clearStoredProgress(storage: Storage | undefined = typeof window !== 'undefined' ? window.localStorage : undefined) {
+  if (!storage) return
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i)
+      if (key?.startsWith(`${PROGRESS_STORAGE_PREFIX}:`)) keys.push(key)
+    }
+    for (const key of keys) storage.removeItem(key)
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export function createLocalStorageProgressRepository(
   storage: Storage | undefined = typeof window !== 'undefined' ? window.localStorage : undefined,
 ): ProgressRepository {

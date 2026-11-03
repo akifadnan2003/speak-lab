@@ -110,8 +110,12 @@ function resolveLessons(
 ): LessonState[] {
   const base = chapter.lessons.map<LessonState>((lesson) => {
     const record = records.get(progressKey(chapter.id, lesson.id))
+    // The chapter gate wins over stored records: a lesson inside a locked
+    // chapter is never openable, even if a record exists (e.g. after a tutor
+    // removed an unlock override). Scores are kept for display.
+    if (!unlocked) return { lesson, status: 'locked', bestScore: record?.bestScore }
     if (record) return { lesson, status: record.status, bestScore: record.bestScore }
-    return { lesson, status: unlocked ? 'available' : 'locked' }
+    return { lesson, status: 'available' }
   })
   const othersDone = base.filter((l) => l.lesson.kind !== 'assessment').every((l) => isLessonDone(l.status))
   return base.map((state) => {

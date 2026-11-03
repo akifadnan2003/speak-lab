@@ -82,6 +82,19 @@ describe('computeProgression', () => {
     expect(states.get('a1-04')?.status).toBe('locked')
   })
 
+  it('locks every lesson of a locked chapter even when progress records exist', () => {
+    const stray: LessonProgressRecord = { studentId: 's1', chapterId: 'a0-02', lessonId: 'a0-02-l01', status: 'in_progress', updatedAt: NOW }
+    const states = computeProgression({
+      chapters: [
+        ...CURRICULUM.slice(0, 1),
+        { ...CURRICULUM[1]!, status: 'authored', lessons: [{ ...a0_01.lessons[0]!, id: 'a0-02-l01' }] },
+      ],
+      lessonProgress: [stray],
+    })
+    expect(states.get('a0-02')?.status).toBe('locked')
+    expect(states.get('a0-02')?.lessons[0]?.status).toBe('locked')
+  })
+
   it('planned chapters never count as complete', () => {
     const planned = CURRICULUM.find((c) => c.status === 'planned')!
     expect(evaluateChapterCompletion(planned, [])).toBe(false)

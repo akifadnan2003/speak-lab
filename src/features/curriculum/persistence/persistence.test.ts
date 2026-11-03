@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { ExerciseAttemptRecord, LessonProgressRecord } from '../ports'
-import { createLocalStorageProgressRepository, PROGRESS_STORAGE_PREFIX } from './local-storage'
+import { clearStoredProgress, createLocalStorageProgressRepository, PROGRESS_STORAGE_PREFIX } from './local-storage'
 import { createMemoryProgressRepository } from './memory'
 
 const NOW = '2026-11-03T10:00:00.000Z'
@@ -72,6 +72,17 @@ describe('localStorage repository', () => {
     localStorage.setItem(`${PROGRESS_STORAGE_PREFIX}:s1`, '{not json')
     const repo = createLocalStorageProgressRepository(localStorage)
     expect(await repo.listLessonProgress('s1')).toEqual([])
+  })
+
+  it('clearStoredProgress removes only SpeakLab progress keys', async () => {
+    const repo = createLocalStorageProgressRepository(localStorage)
+    await repo.recordAttempt(attempt('a1'))
+    await repo.recordAttempt(attempt('b1', 's2'))
+    localStorage.setItem('speaklab.theme', 'dark')
+    clearStoredProgress(localStorage)
+    expect(await repo.listAttempts('s1')).toHaveLength(0)
+    expect(await repo.listAttempts('s2')).toHaveLength(0)
+    expect(localStorage.getItem('speaklab.theme')).toBe('dark')
   })
 
   it('falls back to memory without a Storage', async () => {
