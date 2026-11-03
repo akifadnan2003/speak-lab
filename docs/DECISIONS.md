@@ -84,13 +84,14 @@ browsers without relying on redirect behaviour.
 `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite|recovery` (query string before the
 hash). `captureAuthRedirect()` runs in `main.tsx` before React mounts: it parses token_hash,
 PKCE `code`, implicit fragments and provider errors, keeps them in memory, and rewrites the URL to
-`#/auth/callback?flow=…`. `AuthProvider` then calls `verifyOtp` / `exchangeCodeForSession` /
-`setSession`. `detectSessionInUrl` is off. The hosted templates must be updated by hand
-(`docs/SUPABASE_SETUP.md` §1.3).
+`#/auth/callback?flow=…`. `AuthProvider` then calls `verifyOtp` / `exchangeCodeForSession`.
+Raw implicit-grant tokens in the fragment are rejected rather than passed to `setSession`, because
+a crafted link could sign a victim into an attacker's session (login CSRF). `detectSessionInUrl`
+is off. The hosted templates must be updated by hand (`docs/SUPABASE_SETUP.md` §1.3).
 **Consequences.** No dependency on the redirect allow-list for the invite link itself (the app URL
 is passed as `redirectTo` and still validated by Supabase and by the function allow-list). Tokens
-never persist in history. Fallback formats still work if the templates are not customised, with
-weaker guarantees. Tested with real GoTrue emails in CI.
+never persist in history. Default (non-customised) templates do not work, by design. Tested with
+real GoTrue emails in CI.
 
 ## ADR-010 · One Edge Function for student administration; revocation = status + Auth ban (2026-11-03)
 

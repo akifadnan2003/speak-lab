@@ -46,10 +46,10 @@ The essential line in each template is the link:
 <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery">Choose a new password</a>
 ```
 
-If the templates are left at the defaults, the app still handles the fallback formats
-(`?code=` for PKCE and `#access_token=` for the implicit grant), but the invitation flow then
-depends on the Supabase redirect and the browser's handling of the fragment. Customise the
-templates.
+If the templates are left at the defaults, invitation links arrive as implicit-grant tokens in
+the URL fragment. The app **rejects** that format on purpose (it would let anyone craft a link
+that signs a victim into a foreign session) and shows "This link format is not accepted".
+Customising the two templates is therefore mandatory.
 
 ### 1.4 Authentication → Settings
 

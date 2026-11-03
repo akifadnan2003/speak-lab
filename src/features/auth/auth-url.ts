@@ -5,10 +5,13 @@
  *
  * 1. `?token_hash=…&type=invite|recovery|…`  (our email templates; verified with `verifyOtp`)
  * 2. `?code=…`                               (PKCE flows started in this browser; exchanged)
- * 3. `#access_token=…&refresh_token=…&type=…` (implicit grant from the default `/auth/v1/verify`
- *                                             redirect, e.g. when the hosted email template was
- *                                             not customised)
  * plus `?error=…&error_code=…&error_description=…` (or the same in the fragment) on failure.
+ *
+ * Raw implicit-grant tokens (`#access_token=…&refresh_token=…`, produced by the default
+ * `/auth/v1/verify` redirect when the hosted templates are NOT customised) are deliberately
+ * rejected: anyone could craft such a link with their own tokens and sign a victim into a foreign
+ * session (login CSRF). The app reports them as an unsupported link instead of calling
+ * `setSession`. See docs/SUPABASE_SETUP.md §1.3 for the required template change.
  *
  * The fragment form collides with `HashRouter`, which would treat `#access_token=…` as a route
  * and immediately replace it with `#/login`, losing the tokens. `captureAuthRedirect()` therefore
@@ -21,7 +24,6 @@ export type AuthFlowType = 'invite' | 'recovery' | 'magiclink' | 'signup' | 'ema
 export type AuthRedirect =
   | { kind: 'token_hash'; tokenHash: string; type: AuthFlowType }
   | { kind: 'code'; code: string; type: AuthFlowType | null }
-  | { kind: 'implicit'; accessToken: string; refreshToken: string; type: AuthFlowType | null }
   | { kind: 'error'; code: string; description: string }
 
 const FLOW_TYPES: readonly string[] = ['invite', 'recovery', 'magiclink', 'signup', 'email_change', 'email']
@@ -55,9 +57,14 @@ export function extractAuthRedirect(location: { search: string; hash: string }):
   const code = search.get('code')
   if (code) return { kind: 'code', code, type }
 
-  const accessToken = fragment?.get('access_token')
-  const refreshToken = fragment?.get('refresh_token')
-  if (accessToken && refreshToken) return { kind: 'implicit', accessToken, refreshToken, type }
+  if (fragment?.get('access_token') || fragment?.get('refresh_token')) {
+    return {
+      kind: 'error',
+      code: 'unsupported_link',
+      description:
+        'This link format is not accepted. The SpeakLab email templates must use token_hash links (see the setup guide).',
+    }
+  }
 
   return null
 }

@@ -21,12 +21,12 @@ describe('extractAuthRedirect', () => {
     expect(extractAuthRedirect({ search: '?code=the-code', hash: '#/' })).toEqual({ kind: 'code', code: 'the-code', type: null })
   })
 
-  it('reads implicit-grant tokens from a non-router fragment', () => {
+  it('rejects raw implicit-grant tokens in the fragment (login CSRF guard)', () => {
     const r = extractAuthRedirect({
       search: '',
       hash: '#access_token=at&expires_in=3600&refresh_token=rt&token_type=bearer&type=invite',
     })
-    expect(r).toEqual({ kind: 'implicit', accessToken: 'at', refreshToken: 'rt', type: 'invite' })
+    expect(r).toMatchObject({ kind: 'error', code: 'unsupported_link' })
   })
 
   it('reports provider errors from either location', () => {

@@ -45,14 +45,6 @@ async function applyRedirect(client: AppSupabaseClient, redirect: AuthRedirect):
       if (error) throw error
       return data.session
     }
-    case 'implicit': {
-      const { data, error } = await client.auth.setSession({
-        access_token: redirect.accessToken,
-        refresh_token: redirect.refreshToken,
-      })
-      if (error) throw error
-      return data.session
-    }
     case 'error': {
       const err = new Error(redirect.description)
       ;(err as Error & { code: string }).code = redirect.code

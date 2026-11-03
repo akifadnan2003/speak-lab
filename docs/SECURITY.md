@@ -65,10 +65,11 @@ event; keep `profiles.email` in sync.
 - Email templates link straight to the app with `token_hash` (ADR-009). `captureAuthRedirect()`
   runs before React mounts, keeps the material in memory, and rewrites the address bar to
   `#/auth/callback?flow=invite|recovery`, so tokens never stay in history, bookmarks or logs.
-- Supported inputs: `?token_hash&type` (templates), `?code` (PKCE), `#access_token…` (implicit
-  fallback), and provider errors. Processing happens in `AuthProvider` with `verifyOtp`,
-  `exchangeCodeForSession` or `setSession`; `detectSessionInUrl` is off to avoid a race with the
-  router.
+- Supported inputs: `?token_hash&type` (templates), `?code` (PKCE) and provider errors. Raw
+  implicit-grant tokens in the fragment are **rejected** (a crafted link could otherwise sign a
+  victim into an attacker's session). Processing happens in `AuthProvider` with `verifyOtp` or
+  `exchangeCodeForSession`; `detectSessionInUrl` is off so supabase-js never consumes fragments
+  either.
 - Sessions persist in `localStorage` (`speaklab.auth`), refresh tokens rotate; `signOut()` uses the
   global scope (server-side revocation) and falls back to local sign-out when offline.
 - The own profile is re-read every 60 s and on focus so a disabled account is surfaced quickly;
