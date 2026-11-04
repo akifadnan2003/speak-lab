@@ -29,7 +29,34 @@ Project in use: `https://bpxklwlotpqnfonpnjuc.supabase.co` (dedicated SpeakLab p
 
 The app passes the exact app URL as `redirectTo`; Supabase only honours URLs on this list.
 
-### 1.3 Authentication → Email Templates (required)
+### 1.3 Authentication → Emails → SMTP Settings (required first)
+
+Since June 2026 Supabase does not let free-tier projects edit the auth email templates until a
+**custom SMTP provider** is configured (the Email Templates page shows "Set up custom SMTP to edit
+templates"). The built-in sender is also limited to 2 messages per hour and to addresses of your
+own Supabase team members, so it can never deliver a student invitation. Custom SMTP is therefore
+a prerequisite for section 1.4, not an optimisation.
+
+Any transactional provider works. Two that need no paid plan:
+
+| Provider | Free allowance | Needs your own domain? | SMTP settings |
+| --- | --- | --- | --- |
+| Brevo | 300 emails/day | No: verify a single sender address | host `smtp-relay.brevo.com`, port `587`, user = your Brevo login email, password = an SMTP key from Brevo → SMTP & API |
+| Resend | 3,000 emails/month | Yes: sending to anyone needs a verified domain | host `smtp.resend.com`, port `465`, user `resend`, password = an API key |
+
+Steps (dashboard → Authentication → Emails → SMTP Settings):
+
+1. Create the provider account and verify the sender address (Brevo) or the domain (Resend).
+2. Turn on **Enable Custom SMTP** and fill in sender email, sender name (`SpeakLab`), host,
+   port, username and password. Save.
+3. Authentication → Rate Limits: custom SMTP starts at 30 emails per hour, which is plenty for
+   one tutor. Raise it only if invitations start failing with `rate_limited`.
+4. Reload the Email Templates page: the Source tab is now editable. Continue with section 1.4.
+
+Never disable custom SMTP later: Supabase resets the templates to the defaults when you do, and
+the default links do not work with this app (see below).
+
+### 1.4 Authentication → Email Templates (required)
 
 SpeakLab links go **directly to the app** with a `token_hash`, not through the Supabase
 `/auth/v1/verify` redirect. This is what makes invitation and recovery links reliable on GitHub
@@ -51,14 +78,14 @@ the URL fragment. The app **rejects** that format on purpose (it would let anyon
 that signs a victim into a foreign session) and shows "This link format is not accepted".
 Customising the two templates is therefore mandatory.
 
-### 1.4 Authentication → Settings
+### 1.5 Authentication → Settings
 
 | Setting | Recommended | Note |
 | --- | --- | --- |
 | Email OTP expiration | 3600 s (1 h) | Must match the `SPEAKLAB_INVITE_TTL_SECONDS` function secret so the tutor UI shows the right expiry. |
 | JWT expiry (access token) | 600–3600 s | A disabled student is blocked by RLS immediately and cannot refresh; a shorter JWT expiry shortens the window in which an already-issued token could still *authenticate* (it can no longer read data). |
 
-### 1.5 API keys
+### 1.6 API keys
 
 - Repository **variables**: `VITE_SUPABASE_URL` = project URL, `VITE_SUPABASE_ANON_KEY` = the
   **publishable** key (`sb_publishable_…`). Both are already set.
@@ -173,7 +200,8 @@ For `npm run dev` against the local stack put the values from `supabase status` 
 
 - [ ] Sign-ups off, anonymous off (verified by `GET /auth/v1/settings`: `disable_signup: true`).
 - [ ] Redirect URLs include the GitHub Pages URL.
-- [ ] Invite and Reset-password templates replaced (section 1.3).
+- [ ] Custom SMTP configured and verified (section 1.3).
+- [ ] Invite and Reset-password templates replaced (section 1.4).
 - [ ] Manual backend workflow run successfully (migration applied, function deployed).
 - [ ] Owner user created and `bootstrap_owner` returned `bootstrapped`.
 - [ ] Owner can sign in on the live site and sees **My Students** with zero students.
