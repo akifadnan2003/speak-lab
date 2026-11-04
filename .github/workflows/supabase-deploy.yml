@@ -5,8 +5,10 @@ name: Supabase backend (manual)
 # applies migrations that the hosted project has not seen yet and refuses anything else.
 #
 # Supabase CLI 3.x targets the LOCAL stack by default, so every database command below passes
-# `--remote=<url>`. GitHub-hosted runners are IPv4-only and the direct database endpoint is
-# IPv6, so the URL is the project's shared *Session pooler* (port 5432), which is IPv4-reachable.
+# `--remote=<url>`, and every hosted change (db push, functions deploy, secrets set) passes
+# `--yes` because the runner has no terminal to confirm on. GitHub-hosted runners are IPv4-only
+# and the direct database endpoint is IPv6, so the URL is the project's shared *Session pooler*
+# (port 5432), which is IPv4-reachable.
 # Nothing here ever starts a local stack.
 #
 # Required repository secrets (least privilege, never exposed to the frontend build):
@@ -99,12 +101,13 @@ jobs:
         run: supabase db push --remote="$SUPABASE_DB_URL" --dry-run
       - name: Deploy Edge Functions
         if: ${{ inputs.functions && !inputs.dry_run }}
-        run: supabase functions deploy student-admin --no-verify-jwt
+        run: supabase functions deploy student-admin --no-verify-jwt --yes
       - name: Edge Function secrets
         if: ${{ inputs.functions && !inputs.dry_run }}
         run: |
           supabase secrets set \
             SPEAKLAB_ALLOWED_APP_URLS="https://akifadnan2003.github.io/speak-lab/,http://localhost:5173/speak-lab/" \
-            SPEAKLAB_INVITE_TTL_SECONDS="3600"
+            SPEAKLAB_INVITE_TTL_SECONDS="3600" \
+            --yes
       - name: Migration state after deploy (hosted project via Session pooler)
         run: supabase migration list --remote="$SUPABASE_DB_URL"
