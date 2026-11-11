@@ -12,10 +12,14 @@ concurrency:
 permissions:
   contents: read
 
+# Runner image pinned to ubuntu-24.04 (LTS). `ubuntu-latest` resolves to ubuntu-26.04, whose
+# Ubuntu apt mirrors stopped resolving on GitHub-hosted runners on 2026-11-11, so
+# `playwright install --with-deps` could not install Chromium's system packages (three runs in a
+# row). Bump deliberately with a green run.
 jobs:
   verify:
     name: Typecheck, lint, unit tests, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,7 +39,7 @@ jobs:
 
   e2e:
     name: End-to-end shell (Playwright, preview build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: verify
     timeout-minutes: 20
     steps:
@@ -58,7 +62,7 @@ jobs:
 
   database:
     name: Database policies, Edge Function and real-auth e2e (local Supabase)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: verify
     timeout-minutes: 30
     steps:
