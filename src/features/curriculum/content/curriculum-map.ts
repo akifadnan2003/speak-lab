@@ -1,5 +1,6 @@
 import { CurriculumSchema, type Chapter, type ChapterInput, type CefrLevel, type Skill } from '../schema'
 import { A0_01 } from './chapters/a0-01-to-be'
+import { A2_07 } from './chapters/a2-07-past-continuous'
 
 /**
  * The complete SpeakLab curriculum map, A0 → C1, in prerequisite order.
@@ -152,7 +153,8 @@ const LEVEL_PLANS: Record<CefrLevel, Planned[]> = {
   ],
 }
 
-const AUTHORED: Record<string, ChapterInput> = { [A0_01.id]: A0_01 }
+/** Authored chapters, spliced into the map by id. Everything else is `planned`. */
+const AUTHORED: Record<string, ChapterInput> = { [A0_01.id]: A0_01, [A2_07.id]: A2_07 }
 
 export function chapterIdFor(level: CefrLevel, number: number): string {
   return `${level.toLowerCase()}-${String(number).padStart(2, '0')}`
