@@ -12,10 +12,8 @@ concurrency:
 permissions:
   contents: read
 
-# Runner image pinned to ubuntu-24.04 (LTS). `ubuntu-latest` resolves to ubuntu-26.04, whose
-# Ubuntu apt mirrors stopped resolving on GitHub-hosted runners on 2026-11-11, so
-# `playwright install --with-deps` could not install Chromium's system packages (three runs in a
-# row). Bump deliberately with a green run.
+# Runner image pinned to ubuntu-24.04 (LTS) so the browser suites run on a known image; bump it
+# deliberately with a green run rather than through `ubuntu-latest`.
 jobs:
   verify:
     name: Typecheck, lint, unit tests, build
@@ -49,7 +47,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium (system packages when apt is reachable, browser only otherwise)
+        # `--with-deps` runs apt-get; on 2026-11-11 the runners' Ubuntu mirror stopped resolving on
+        # every image and only font packages were missing. Chromium's libraries ship with the
+        # runner image, so fall back to the browser download alone instead of failing the suite.
+        run: |
+          npx playwright install --with-deps chromium             || { echo "::warning::apt unreachable, installing the browser without system packages"; npx playwright install chromium; }
       - run: npm run test:e2e
         env:
           CI: true
@@ -99,7 +102,12 @@ jobs:
           '
       - name: Authorization and lifecycle integration tests
         run: npm run test:db
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium (system packages when apt is reachable, browser only otherwise)
+        # `--with-deps` runs apt-get; on 2026-11-11 the runners' Ubuntu mirror stopped resolving on
+        # every image and only font packages were missing. Chromium's libraries ship with the
+        # runner image, so fall back to the browser download alone instead of failing the suite.
+        run: |
+          npx playwright install --with-deps chromium             || { echo "::warning::apt unreachable, installing the browser without system packages"; npx playwright install chromium; }
       - name: Real-auth end-to-end (invite, recovery, disable, logout, refresh)
         run: npm run test:e2e:auth
         env:
