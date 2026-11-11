@@ -29,8 +29,8 @@ and move it into `docs/DECISIONS.md`.
 
 ## 2. Data model
 
-`supabase/migrations/20261111150000_vocabulary_persistence.sql` (schema, functions, RLS) and
-`20261111150100_vocabulary_bank_v1.sql` (generated bank mirror).
+`supabase/migrations/20261112090000_vocabulary_persistence.sql` (schema, functions, RLS) and
+`20261112090100_vocabulary_bank_v1.sql` (generated bank mirror).
 
 | Table | Purpose | Client access |
 | --- | --- | --- |
@@ -213,7 +213,7 @@ adds this document.
   If the integration renames it, update one import.
 - `src/features/curriculum/CurriculumProvider.tsx` `useProgression()`: used by the vocabulary
   dashboard for current chapters (unchanged by this work).
-- Migration order: `20261111150000` and `20261111150100` depend only on M2's migration. If the M3
+- Migration order: `20261112090000` and `20261112090100` depend only on M2's migration. If the M3
   integration adds curriculum tables with an *earlier* timestamp, order is still fine; nothing here
   references curriculum tables.
 - No table, type or function names overlap with M2; the names are reserved for vocabulary
