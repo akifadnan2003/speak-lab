@@ -6,9 +6,10 @@ evidence, and the integration handoff for moving M4 vocabulary progress from the
 student's account.
 
 Provisional decision record: the ADR below is numbered `ADR-M4P` on purpose. `docs/DECISIONS.md`
-on `main` (M2) and on the M3/M4 branches both use ADR-009 to ADR-011 for different decisions; the
-M3 integration renumbers them. When this work is integrated, give `ADR-M4P` the next free number
-and move it into `docs/DECISIONS.md`.
+on `main` (M2) and on the M3/M4 branches both use ADR-009 to ADR-011 for different decisions. The
+M3 integration (PR #2, `c387abc`) renumbered its ADRs to 013 to 016, so on that base M4's
+"Vocabulary: SM-2-style scheduler…" becomes **ADR-017** and `ADR-M4P` becomes **ADR-018**. Move it
+into `docs/DECISIONS.md` with the next free number at integration time.
 
 ---
 
@@ -169,13 +170,18 @@ PGlite does not run GoTrue, PostgREST or concurrent connections; that is what th
 Branch layout (`git log --oneline --first-parent m4-integration-prep`):
 
 ```
-<docs/tests>  Document vocabulary persistence and add the full-stack test
-2cb418d       Client repository, offline queue, consented import, cleanup
-77c6233       Schema, review RPC, RLS, bank seed (+ PGlite tests)
-7ea0a83       Add PGlite devDependency + test:db:pglite script
-9bf65d7       SCAFFOLDING merge of main (M2) — do not carry forward
-b25f50d       M4 standalone (worktree-m4-vocabulary)
+76d486c  Move the vocabulary migrations after the M3 integration's migration
+4f4b089  Document vocabulary persistence and add the full-stack test
+2cb418d  Client repository, offline queue, consented import, cleanup
+77c6233  Schema, review RPC, RLS, bank seed (+ PGlite tests)
+7ea0a83  Add PGlite devDependency + test:db:pglite script
+9bf65d7  SCAFFOLDING merge of main (M2): do not carry forward
+b25f50d  M4 standalone (worktree-m4-vocabulary)
 ```
+
+Apply `9bf65d7..m4-integration-prep` as one range. Until `76d486c` is applied, the vocabulary
+migration still has M3's version number (`20261111150000`); never deploy from the middle of the
+range.
 
 `9bf65d7` contains *my* resolution of M3-vs-M2 conflicts (router, docs). It competes with the M3
 integration and must not reach `main`. Only the commits after it are the deliverable.
@@ -186,9 +192,10 @@ integration and must not reach `main`. Only the commits after it are the deliver
 # 1. Bring M4 itself onto the integrated foundation (same touch points as before).
 git switch -c m4-integration INTEGRATED
 git merge --no-ff worktree-m4-vocabulary
-#    Expected conflicts (dry run on ce856c9): src/app/router.tsx (add the one route
-#    /vocabulary/practice/:modeId next to /vocabulary inside RequireRole student) and
-#    docs/ROADMAP.md (keep both). Renumber M4's "ADR-011 · Vocabulary…" to the next free ADR.
+#    Conflicts seen in the dry run on c387abc: src/app/router.tsx (keep INTEGRATED's tree and add
+#    { path: '/vocabulary/practice/:modeId', element: <VocabularyPracticePage /> } right after the
+#    /vocabulary route inside RequireRole student), docs/ROADMAP.md and docs/DECISIONS.md (keep
+#    both sides; rename M4's "ADR-011 · Vocabulary…" to ADR-017).
 npm ci && npm run check
 
 # 2. Replay only the preparation commits, skipping the scaffolding merge.
@@ -201,8 +208,17 @@ npm ci && npm run check && npm run test:db:pglite && npx playwright test
 #    supabase/tests/vocabulary-rls.test.ts against the full stack for the first time.
 ```
 
-The result of steps 1 and 2 against Agent 1's in-progress `ce856c9` is recorded in the commit that
-adds this document.
+**Dry run (2026-11-11), throwaway detached worktree, nothing pushed:**
+
+| Base | Step 1 conflicts | Step 2 (cherry-pick) | `npm run check` | `test:db:pglite` | Playwright |
+| --- | --- | --- | --- | --- | --- |
+| `ce856c9` (M3 merge, local) | router, ROADMAP | clean | 257 passed | 22 passed (3 migrations) | not run |
+| `c387abc` (PR #2 head) | router, ROADMAP, DECISIONS | clean (package.json auto-merged) | 290 passed, `sync:functions:check` ok | 22 passed (**all 4 migrations, incl. curriculum**) | 36 passed |
+
+The M3 integration registers its cleaner with a side-effect import in `App.tsx`
+(`@/features/curriculum/local-cleanup`). Vocabulary registers from `VocabularyProvider` instead,
+which is sufficient: every vocabulary repository is created by that module, and storage keys are
+purged by M2 regardless. An `App.tsx` import is optional for symmetry.
 
 ### Potential conflicts and dependencies
 
@@ -213,9 +229,11 @@ adds this document.
   If the integration renames it, update one import.
 - `src/features/curriculum/CurriculumProvider.tsx` `useProgression()`: used by the vocabulary
   dashboard for current chapters (unchanged by this work).
-- Migration order: `20261112090000` and `20261112090100` depend only on M2's migration. If the M3
-  integration adds curriculum tables with an *earlier* timestamp, order is still fine; nothing here
-  references curriculum tables.
+- Migration versions: the M3 integration's `20261111150000_curriculum_progress.sql` had the same
+  version as the first vocabulary migration; vocabulary now uses `20261112090000`/`20261112090100`
+  (commit `76d486c`). Before merging, check again that no other branch claimed these versions.
+  Vocabulary depends only on M2's migration and references no curriculum table. M3's new
+  `public.tutor_of()` helper could replace the inline tutor joins later; not needed.
 - No table, type or function names overlap with M2; the names are reserved for vocabulary
   (`vocabulary_*`, `student_vocabulary`). The M3 integration must not create its own vocabulary tables.
 
