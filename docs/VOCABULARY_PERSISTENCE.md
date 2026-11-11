@@ -30,8 +30,8 @@ into `docs/DECISIONS.md` with the next free number at integration time.
 
 ## 2. Data model
 
-`supabase/migrations/20261112090000_vocabulary_persistence.sql` (schema, functions, RLS) and
-`20261112090100_vocabulary_bank_v1.sql` (generated bank mirror).
+`supabase/migrations/20261111160800_vocabulary_persistence.sql` (schema, functions, RLS) and
+`20261111160900_vocabulary_bank_v1.sql` (generated bank mirror).
 
 | Table | Purpose | Client access |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ assessment-integrity follow-up applies here too).
 **Data API exposure.** New tables are not assumed to be exposed or protected by defaults: every
 table and function has explicit `revoke … from public, anon, authenticated` and the minimal
 `grant`. The PGlite harness deliberately recreates Supabase's most permissive default privileges,
-so a forgotten revoke fails the tests (verified by deleting the revokes: three tests failed).
+so a forgotten revoke fails the tests. Verified by deleting them one at a time: the table revokes (three tests fail), and each EXECUTE revoke on `record_vocabulary_reviews`, `reset_vocabulary_progress` and `vocabulary_schedule` (one test each).
 
 ## 4. Ordering and conflict rules
 
@@ -179,9 +179,8 @@ Branch layout (`git log --oneline --first-parent m4-integration-prep`):
 b25f50d  M4 standalone (worktree-m4-vocabulary)
 ```
 
-Apply `9bf65d7..m4-integration-prep` as one range. Until `76d486c` is applied, the vocabulary
-migration still has M3's version number (`20261111150000`); never deploy from the middle of the
-range.
+Apply `9bf65d7..m4-integration-prep` as one range. In the middle of the range the vocabulary
+migration still has M3's version number (`20261111150000`); never deploy from there.
 
 `9bf65d7` contains *my* resolution of M3-vs-M2 conflicts (router, docs). It competes with the M3
 integration and must not reach `main`. Only the commits after it are the deliverable.
@@ -230,9 +229,13 @@ purged by M2 regardless. An `App.tsx` import is optional for symmetry.
 - `src/features/curriculum/CurriculumProvider.tsx` `useProgression()`: used by the vocabulary
   dashboard for current chapters (unchanged by this work).
 - Migration versions: the M3 integration's `20261111150000_curriculum_progress.sql` had the same
-  version as the first vocabulary migration; vocabulary now uses `20261112090000`/`20261112090100`
-  (commit `76d486c`). Before merging, check again that no other branch claimed these versions.
-  Vocabulary depends only on M2's migration and references no curriculum table. M3's new
+  version as the first vocabulary migration did. Vocabulary now uses `20261111160800` and
+  `20261111160900` (current UTC time when stamped, like `supabase migration new`). The deploy
+  workflow runs `supabase db push` **without `--include-all`**, so a migration dated earlier than
+  the newest one already applied remotely is refused. **At integration, if anything on the
+  integrated branch is newer, re-stamp both vocabulary files with a fresh timestamp later than
+  everything else, then update `VOCABULARY_BANK_SEED.file`** (the bank-seed test fails until you
+  do). Vocabulary depends only on M2's migration and references no curriculum table. M3's new
   `public.tutor_of()` helper could replace the inline tutor joins later; not needed.
 - No table, type or function names overlap with M2; the names are reserved for vocabulary
   (`vocabulary_*`, `student_vocabulary`). The M3 integration must not create its own vocabulary tables.
@@ -248,5 +251,7 @@ purged by M2 regardless. An `App.tsx` import is optional for symmetry.
    policies are already in place.
 6. Move `persistence/wire.ts` row types into `src/lib/supabase/database.types.ts` once that file is
    free of concurrent edits.
-7. A UI indicator for queued answers (`pendingCount`) and refetch after a background retry.
+7. A UI indicator for queued answers (`pendingCount`) and refetch after a background retry. Until
+   then the header says "Saved to your account (answers given offline sync on reconnect)" rather
+   than claiming everything is synced.
 8. Rate limiting or server-side grading if vocabulary ever counts towards an assessment.

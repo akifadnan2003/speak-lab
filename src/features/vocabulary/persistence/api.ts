@@ -14,7 +14,7 @@ import {
  * implementation that talks to the network.
  *
  * Authorization never depends on anything sent from here: the database takes the student from
- * the verified JWT and RLS limits every read (supabase/migrations/20261112090000_*.sql).
+ * the verified JWT and RLS limits every read (supabase/migrations/20261111160800_*.sql).
  */
 export interface VocabularyApi {
   fetchStates(studentId: string, options?: { dueBefore?: string }): Promise<StudentVocabularyRow[]>
