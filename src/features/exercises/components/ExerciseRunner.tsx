@@ -108,6 +108,7 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
     if (!focusHeadingAfterNavigation.current) return
     focusHeadingAfterNavigation.current = false
     headingRef.current?.focus({ preventScroll: true })
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- re-run exactly when the exercise changes
   }, [session.index])
 
   const finish = useCallback(() => {
