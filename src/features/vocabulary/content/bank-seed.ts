@@ -14,7 +14,7 @@ import type { VocabularyEntry } from '../schema'
  */
 export const VOCABULARY_BANK_SEED = {
   version: 1,
-  file: '20261112090100_vocabulary_bank_v1.sql',
+  file: '20261111160900_vocabulary_bank_v1.sql',
 } as const
 
 function quote(value: string): string {

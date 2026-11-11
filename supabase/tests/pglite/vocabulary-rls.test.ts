@@ -99,9 +99,10 @@ describe('anonymous visitors', () => {
     for (const table of VOCAB_TABLES) await expectDenied(t.query({ kind: 'anon' }, `select * from public.${table}`))
   })
 
-  it('cannot call the review or reset functions', async () => {
-    await expectDenied(t.query({ kind: 'anon' }, `select public.record_vocabulary_reviews(null, '[]'::jsonb, 'live')`))
-    await expectDenied(t.query({ kind: 'anon' }, `select public.reset_vocabulary_progress(null)`))
+  it('cannot call the review or reset functions (refused by EXECUTE grants, not only by the body)', async () => {
+    const noExecute = /permission denied for function/i
+    await expectDenied(t.query({ kind: 'anon' }, `select public.record_vocabulary_reviews(null, '[]'::jsonb, 'live')`), noExecute)
+    await expectDenied(t.query({ kind: 'anon' }, `select public.reset_vocabulary_progress(null)`), noExecute)
   })
 })
 
@@ -236,10 +237,14 @@ describe('unauthorized writes', () => {
   })
 
   it('internal scheduling helpers are not callable by clients', async () => {
-    await expectDenied(t.query(A(), `select public.vocabulary_mode_skill('active_recall')`))
-    await expectDenied(t.query(A(), `select public.vocabulary_clamp_ease(2.5)`))
+    const schedule = /permission denied for function vocabulary_schedule/i
+    await expectDenied(t.query(A(), `select public.vocabulary_mode_skill('active_recall')`), /permission denied for function/i)
+    await expectDenied(t.query(A(), `select public.vocabulary_clamp_ease(2.5)`), /permission denied for function/i)
+    await expectDenied(t.query(A(), `select public.vocabulary_review_quality('recall', true, false, null)`), /permission denied for function/i)
+    await expectDenied(t.query(A(), `select public.vocabulary_parse_instant('2026-01-01T00:00:00Z')`), /permission denied for function/i)
     await expectDenied(
       t.query(A(), `select public.vocabulary_schedule(s, 'recall', 5, now()) from public.student_vocabulary s limit 1`),
+      schedule,
     )
   })
 

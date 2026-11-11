@@ -103,7 +103,7 @@ function VocabularyDashboard() {
         actions={
           <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
             <Smartphone className="size-3.5" aria-hidden />
-            {storage === 'device' ? 'Progress saved on this device' : 'Progress synced'}
+            {storage === 'device' ? 'Progress saved on this device' : 'Saved to your account (answers given offline sync on reconnect)'}
           </span>
         }
       />
