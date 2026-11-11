@@ -113,3 +113,95 @@ describe('Learn flow with the real curriculum (preview session)', () => {
     expect(await screen.findByRole('heading', { name: 'am, is, are' })).toBeInTheDocument()
   })
 })
+
+describe('Chapter check in the preview session (client gateway applying the server rules)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
+
+  function unlockAssessment() {
+    // Every practice lesson of A0-01 done, so the chapter check is available.
+    localStorage.setItem(
+      `${PROGRESS_STORAGE_PREFIX}:preview-student-1`,
+      JSON.stringify({
+        lessonProgress: Array.from({ length: 10 }, (_, i) => ({
+          studentId: 'preview-student-1',
+          chapterId: 'a0-01',
+          lessonId: `a0-01-l${String(i + 1).padStart(2, '0')}`,
+          status: 'completed',
+          bestScore: 100,
+          completedAt: 'x',
+          updatedAt: 'x',
+        })),
+        attempts: [],
+        overrides: [],
+        assessments: [],
+      }),
+    )
+  }
+
+  it('starts an attempt, saves answers without feedback, submits and records the attempt (not as lesson progress)', async () => {
+    const user = userEvent.setup()
+    unlockAssessment()
+    await renderAt('/learn/a0-01/lessons/a0-01-l11')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chapter check' })).toBeInTheDocument()
+    expect(await screen.findByTestId('assessment-status')).toHaveTextContent('No attempts yet')
+    await user.click(screen.getByTestId('start-assessment'))
+    expect(await screen.findByTestId('assessment-attempt')).toHaveTextContent('Attempt 1 of 3')
+
+    // Walk through every exercise giving a minimal (mostly wrong) answer, then submit.
+    const total = Number(/of (\d+)/.exec(screen.getByText(/Exercise 1 of/).textContent ?? '')?.[1])
+    expect(total).toBeGreaterThan(5)
+    for (let i = 0; i < total; i++) {
+      // Scope every query to the runner: the app shell has its own radios (theme switch).
+      const runner = within(screen.getByTestId('exercise-runner'))
+      const check = runner.getByTestId('check-answer')
+      if ((check as HTMLButtonElement).disabled) {
+        const radio = runner.queryAllByRole('radio')[0]
+        if (radio) await user.click(radio)
+        for (const input of runner.queryAllByRole('textbox')) await user.type(input, 'x')
+        const pool = runner.queryByTestId('ordering-pool')
+        if (pool) {
+          const tokens = within(pool).getAllByRole('button').length
+          for (let k = 0; k < tokens; k++) {
+            const chip = within(pool).queryAllByRole('button').find((b) => !(b as HTMLButtonElement).disabled)
+            if (!chip) break
+            await user.click(chip)
+          }
+        }
+        const left = runner.queryByRole('group', { name: 'Left items' })
+        const right = runner.queryByRole('group', { name: 'Right items' })
+        if (left && right) {
+          const count = Math.min(within(left).getAllByRole('button').length, within(right).getAllByRole('button').length)
+          for (let k = 0; k < count; k++) {
+            await user.click(within(left).getAllByRole('button')[k]!)
+            await user.click(within(right).getAllByRole('button')[k]!)
+          }
+        }
+      }
+      await user.click(runner.getByTestId('check-answer'))
+      expect(runner.queryByTestId('exercise-feedback')).not.toBeInTheDocument()
+      expect(runner.getByRole('status')).toHaveTextContent('Answer saved')
+      const next = runner.queryByTestId('next-exercise')
+      if (next) await user.click(next)
+    }
+    const submit = screen.getByRole('button', { name: /Submit/ })
+    expect(submit).toBeEnabled()
+    await user.click(submit)
+    expect(await screen.findByTestId('summary-outcome')).toHaveTextContent(/Passed|Not passed yet/)
+    expect(screen.getByTestId('summary-attempts')).toHaveTextContent('2 attempts left')
+
+    const stored = JSON.parse(localStorage.getItem(`${PROGRESS_STORAGE_PREFIX}:preview-student-1`) ?? '{}') as {
+      assessments?: { status: string; attemptNumber: number }[]
+      lessonProgress?: { lessonId: string }[]
+    }
+    expect(stored.assessments?.[0]).toMatchObject({ status: 'submitted', attemptNumber: 1 })
+    expect(stored.lessonProgress?.some((r) => r.lessonId === 'a0-01-l11')).toBe(false)
+  }, 60_000)
+
+  it('refuses the chapter check while practice lessons are open', async () => {
+    await renderAt('/learn/a0-01/lessons/a0-01-l11')
+    expect(await screen.findByText('This lesson is locked')).toBeInTheDocument()
+  })
+})

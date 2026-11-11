@@ -214,3 +214,99 @@ describe('ExerciseRunner — assessment mode', () => {
     expect(screen.getByRole('button', { name: 'Retake' })).toBeInTheDocument()
   })
 })
+
+describe('ExerciseRunner - server-graded assessment', () => {
+  const twoQuestions = () =>
+    lesson([mc('t-e1', 'I ___', ['is', 'am'], 1, { explanation: t('I takes am.') }), mc('t-e2', 'She ___', ['is', 'am'], 0)], 'assessment')
+
+  it('locks answers without grading, submits them together and hides answers after a fail', async () => {
+    const user = userEvent.setup()
+    const submit = vi.fn().mockResolvedValue({
+      attempt: { id: 'att', status: 'submitted', score: 50, passed: false },
+      results: [
+        { exerciseId: 't-e1', correct: false, score: 0 },
+        { exerciseId: 't-e2', correct: true, score: 1 },
+      ],
+      revealAnswers: false,
+      attemptsUsed: 1,
+      attemptsAllowed: 3,
+    })
+    const onRetake = vi.fn()
+    render(<ExerciseRunner lesson={twoQuestions()} passMark={80} assessment={{ attemptsUsed: 0, attemptsAllowed: 3, submit, onRetake }} />)
+    expect(screen.getByTestId('assessment-attempt')).toHaveTextContent('Attempt 1 of 3')
+
+    await user.click(screen.getByRole('radio', { name: /is/ }))
+    await user.click(screen.getByRole('button', { name: 'Save answer' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Answer saved')
+    expect(screen.getByRole('radio', { name: /is/ })).toBeDisabled()
+    await user.click(screen.getByTestId('next-exercise'))
+    await user.click(screen.getByRole('radio', { name: /is/ }))
+    await user.click(screen.getByRole('button', { name: 'Save answer' }))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+
+    expect(submit).toHaveBeenCalledWith([
+      { exerciseId: 't-e1', answer: { type: 'multiple_choice', optionId: 'a' } },
+      { exerciseId: 't-e2', answer: { type: 'multiple_choice', optionId: 'a' } },
+    ])
+    const summary = await screen.findByTestId('exercise-summary')
+    expect(screen.getByTestId('summary-outcome')).toHaveTextContent('Not passed yet')
+    expect(screen.getByTestId('summary-score')).toHaveTextContent('Score 50%')
+    expect(screen.getByTestId('summary-attempts')).toHaveTextContent('2 attempts left')
+    expect(screen.getByTestId('answers-hidden')).toBeInTheDocument()
+    expect(summary).not.toHaveTextContent('I takes am.')
+    expect(summary).not.toHaveTextContent('Correct:')
+    await user.click(screen.getByTestId('retake'))
+    expect(onRetake).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the correct answers and explanations when the server reveals them, and no retake when attempts are gone', async () => {
+    const user = userEvent.setup()
+    const submit = vi.fn().mockResolvedValue({
+      attempt: { id: 'att', status: 'submitted', score: 50, passed: false },
+      results: [
+        { exerciseId: 't-e1', correct: false, score: 0, correctAnswer: 'am' },
+        { exerciseId: 't-e2', correct: true, score: 1, correctAnswer: 'is' },
+      ],
+      revealAnswers: true,
+      attemptsUsed: 3,
+      attemptsAllowed: 3,
+    })
+    render(<ExerciseRunner lesson={twoQuestions()} passMark={80} assessment={{ attemptsUsed: 2, attemptsAllowed: 3, submit }} />)
+    await user.click(screen.getByRole('radio', { name: /is/ }))
+    await user.click(screen.getByRole('button', { name: 'Save answer' }))
+    await user.click(screen.getByTestId('next-exercise'))
+    await user.click(screen.getByRole('radio', { name: /is/ }))
+    await user.click(screen.getByRole('button', { name: 'Save answer' }))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    const summary = await screen.findByTestId('exercise-summary')
+    expect(summary).toHaveTextContent('Correct: am')
+    expect(summary).toHaveTextContent('I takes am.')
+    expect(screen.getByTestId('summary-attempts')).toHaveTextContent('No attempts left')
+    expect(screen.queryByTestId('retake')).not.toBeInTheDocument()
+  })
+
+  it('keeps the answers and lets the learner retry when the submission fails', async () => {
+    const user = userEvent.setup()
+    const submit = vi.fn().mockRejectedValueOnce(new Error('Could not reach the server.')).mockResolvedValue({
+      attempt: { id: 'att', status: 'submitted', score: 100, passed: true },
+      results: [
+        { exerciseId: 't-e1', correct: true, score: 1, correctAnswer: 'am' },
+        { exerciseId: 't-e2', correct: true, score: 1, correctAnswer: 'is' },
+      ],
+      revealAnswers: true,
+      attemptsUsed: 1,
+      attemptsAllowed: 3,
+    })
+    render(<ExerciseRunner lesson={twoQuestions()} passMark={80} assessment={{ attemptsUsed: 0, attemptsAllowed: 3, submit }} />)
+    await user.click(screen.getByRole('radio', { name: /am/ }))
+    await user.click(screen.getByRole('button', { name: 'Save answer' }))
+    await user.click(screen.getByTestId('next-exercise'))
+    await user.click(screen.getByRole('radio', { name: /is/ }))
+    await user.click(screen.getByRole('button', { name: 'Save answer' }))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByTestId('assessment-error')).toHaveTextContent('Could not reach the server.')
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByTestId('summary-outcome')).toHaveTextContent('Passed')
+    expect(submit).toHaveBeenCalledTimes(2)
+  })
+})
