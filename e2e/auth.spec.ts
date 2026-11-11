@@ -250,8 +250,10 @@ test('student learns on this device, progress follows the account to another dev
   const device2 = await browser.newContext()
   const again = await device2.newPage()
   await login(again, email, STUDENT_PASSWORD)
+  await expect(again).toHaveURL(/#\/$/)
   await again.goto('./#/learn/a0-01')
-  await expect(again.getByTestId('lesson-row').first()).toHaveAttribute('data-status', 'in_progress')
+  await expect(again.getByRole('heading', { name: /Sentence structure/ })).toBeVisible({ timeout: 30_000 })
+  await expect(again.getByTestId('lesson-row').first()).toHaveAttribute('data-status', 'in_progress', { timeout: 30_000 })
   const rows = await admin.from('exercise_attempts').select('exercise_id, correct').eq('student_id', created.data.user!.id)
   expect(rows.data).toEqual([{ exercise_id: 'a0-01-l01-e01', correct: true }])
 
