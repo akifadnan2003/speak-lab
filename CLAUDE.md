@@ -36,14 +36,16 @@ Supabase operations (setup, bootstrap, deploy, rollback): `docs/SUPABASE_SETUP.m
   account switching purge it.
 - Chapter checks are graded only by the `assessment` Edge Function; `assessment_attempts` is never
   written by clients and clients never submit scores. Practice progress is the learner's own rows.
-- `supabase/functions/_shared/features/**` is generated from `src/features` by
-  `npm run sync:functions`; never edit it by hand, and run the sync after changing schemas, content,
-  the grading engine, progression or `assessment-rules.ts` (CI checks it).
+- Two generated artefacts, never edited by hand, regenerated with `npm run sync` after changing
+  schemas, content, the grading engine, progression or `assessment-rules.ts` (CI checks both):
+  `supabase/functions/_shared/features/**` (the Edge Function's copy) and
+  `src/features/curriculum/content/generated/client-curriculum.ts` (the curriculum real builds
+  ship, with assessment answer keys removed). Real builds must never import `content/curriculum-map`.
 
 ## Commands
 
 `npm run dev` · `npm run typecheck` · `npm run lint` · `npm run test` · `npm run test:e2e` ·
-`npm run build` · `npm run sync:functions` (regenerate the Edge Function's shared copy) ·
+`npm run build` · `npm run sync` (regenerate the client curriculum and the Edge Function's shared copy) ·
 `npm run check` (typecheck, lint, sync check, test, build).
 With Docker: `npx supabase start` · `npm run test:db` (RLS/lifecycle) · `npm run test:e2e:auth`.
 

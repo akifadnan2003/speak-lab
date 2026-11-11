@@ -48,8 +48,9 @@ the assessment flow change.
    `mergeAssessmentResults`, `countUsedAttempts`, `openAttempt`. The memory gateway (preview and
    unit tests) and the Edge Function implement the same rules; the integration suite proves the
    function against Postgres.
-4. **Answer keys do not ship for assessment lessons.** `redactAssessmentKeys` runs in real builds
-   before content reaches the screens. Ordering and matching keys are inherent to the exercise
+4. **Answer keys do not ship for assessment lessons.** `scripts/build-client-content.mjs` generates
+   the curriculum real builds import, with assessment keys removed; the full content module is
+   only reachable behind a build-time `VITE_UI_PREVIEW` constant. Ordering and matching keys are inherent to the exercise
    presentation and remain (documented in SECURITY.md).
 5. **The runner has one extra mode, not a fork.** `ExerciseRunner` with the `assessment` prop
    locks answers (`lock` action), submits them together, and finishes from server results

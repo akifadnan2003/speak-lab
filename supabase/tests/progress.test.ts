@@ -9,8 +9,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { accessTokenOf, adminClient, ensureTutor, localStack, STUDENT_PASSWORD, TUTOR_PASSWORD, uniqueEmail, userClient } from './helpers.ts'
 
-/* The curriculum and grading engine are loaded from `src/` at run time (vitest alias) to build
- * answer keys. The path is a variable so the node tsconfig does not pull the app sources in. */
+/* The full curriculum (with answer keys) and the grading helpers are loaded from `src/` at run
+ * time (vitest alias) to build answer keys. The path is a variable so the node tsconfig does not
+ * pull the app sources in. */
 interface Exercise {
   id: string
   type: string
@@ -87,7 +88,7 @@ async function completePractice(client: SupabaseClient, studentId: string) {
 }
 
 beforeAll(async () => {
-  const contentPath = '../../src/features/curriculum/content/index.ts'
+  const contentPath = '../../src/features/curriculum/content/curriculum-map.ts'
   const answersPath = '../../src/features/exercises/engine/test-answers.ts'
   CURRICULUM = ((await import(contentPath)) as { CURRICULUM: Chapter[] }).CURRICULUM
   correctAnswerFor = ((await import(answersPath)) as { correctAnswerFor: typeof correctAnswerFor }).correctAnswerFor

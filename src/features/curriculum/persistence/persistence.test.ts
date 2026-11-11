@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { correctAnswerFor } from '@/features/exercises/engine/test-answers'
 import { ASSESSMENT_ATTEMPT_TTL_MS, MAX_ASSESSMENT_ATTEMPTS } from '../assessment-rules'
-import { CURRICULUM } from '../content'
+import { CURRICULUM } from '../content/curriculum-map'
 import type { ExerciseAttemptRecord, LessonProgressRecord } from '../ports'
 import { clearStoredProgress, createLocalStorageProgressRepository, PROGRESS_STORAGE_PREFIX } from './local-storage'
 import { createMemoryAssessmentGateway, createMemoryProgressRepository, createMemoryStore } from './memory'
@@ -125,8 +125,8 @@ describe('memory assessment gateway (reference behaviour for the server)', () =>
 
   it('grades a submission, records it as progress, and hides answers after a fail', async () => {
     const store = createMemoryStore()
-    const gateway = createMemoryAssessmentGateway(store)
-    const repo = createMemoryProgressRepository(store)
+    const gateway = createMemoryAssessmentGateway(store, undefined, CURRICULUM)
+    const repo = createMemoryProgressRepository(store, undefined, CURRICULUM)
     const started = await gateway.start({ studentId: 's1', chapterId: CHAPTER, lessonId: LESSON })
     expect(started.attemptsUsed).toBe(0)
     expect(started.attempt.status).toBe('in_progress')
@@ -148,20 +148,20 @@ describe('memory assessment gateway (reference behaviour for the server)', () =>
 
   it('reveals answers on a pass and marks the lesson completed', async () => {
     const store = createMemoryStore()
-    const gateway = createMemoryAssessmentGateway(store)
+    const gateway = createMemoryAssessmentGateway(store, undefined, CURRICULUM)
     const opened = await gateway.start({ studentId: 's1', chapterId: CHAPTER, lessonId: LESSON })
     const passed = await gateway.submit({ studentId: 's1', attemptId: opened.attempt.id, answers: correctAnswers() })
     expect(passed.attempt.passed).toBe(true)
     expect(passed.attempt.score).toBe(100)
     expect(passed.revealAnswers).toBe(true)
     expect(passed.results.every((r) => r.correct && typeof r.correctAnswer === 'string')).toBe(true)
-    const merged = await createMemoryProgressRepository(store).listLessonProgress('s1')
+    const merged = await createMemoryProgressRepository(store, undefined, CURRICULUM).listLessonProgress('s1')
     expect(merged.find((r) => r.lessonId === LESSON)).toMatchObject({ status: 'completed', bestScore: 100 })
   })
 
   it('enforces the retake limit, discloses answers on the last attempt, and a tutor reset restarts the count', async () => {
     const store = createMemoryStore()
-    const gateway = createMemoryAssessmentGateway(store)
+    const gateway = createMemoryAssessmentGateway(store, undefined, CURRICULUM)
     for (let i = 1; i <= MAX_ASSESSMENT_ATTEMPTS; i++) {
       const opened = await gateway.start({ studentId: 's1', chapterId: CHAPTER, lessonId: LESSON })
       expect(opened.attemptsUsed).toBe(i - 1)
@@ -188,7 +188,7 @@ describe('memory assessment gateway (reference behaviour for the server)', () =>
   })
 
   it('refuses non-assessment lessons', async () => {
-    const gateway = createMemoryAssessmentGateway()
+    const gateway = createMemoryAssessmentGateway(undefined, undefined, CURRICULUM)
     await expect(gateway.start({ studentId: 's1', chapterId: CHAPTER, lessonId: 'a0-01-l01' })).rejects.toThrow(/not an assessment/)
   })
 })

@@ -28,7 +28,7 @@ import {
   mergeAssessmentResults,
   revealAnswersAfter,
 } from '../_shared/features/curriculum/assessment-rules.ts'
-import { CURRICULUM } from '../_shared/features/curriculum/content/index.ts'
+import { CURRICULUM } from '../_shared/features/curriculum/content/curriculum-map.ts'
 import type {
   AssessmentAttemptSummary,
   AssessmentExerciseResult,

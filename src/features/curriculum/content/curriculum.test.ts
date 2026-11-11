@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CHAPTERS_PER_LEVEL, CURRICULUM, findChapterSync, findLessonSync } from './index'
+import { CHAPTERS_PER_LEVEL, CURRICULUM } from './curriculum-map'
+import { findChapterSync, findLessonSync } from './index'
 import { CEFR_LEVELS, CurriculumSchema, topologicalOrder } from '../schema'
 
 describe('curriculum map', () => {

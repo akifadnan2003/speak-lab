@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { grade, isAnswerComplete } from '@/features/exercises/engine/grade'
-import { CURRICULUM, findChapterSync } from './index'
+import { CURRICULUM } from './curriculum-map'
+import { CLIENT_CURRICULUM_JSON } from './generated/client-curriculum'
+import { CURRICULUM as APP_CURRICULUM } from './index'
 import { isRedacted, redactAssessmentKeys, REDACTED } from './redact'
 
 describe('redactAssessmentKeys', () => {
   const redacted = redactAssessmentKeys(CURRICULUM)
-  const original = findChapterSync('a0-01')!
+  const original = CURRICULUM.find((c) => c.id === 'a0-01')!
   const chapter = redacted.find((c) => c.id === 'a0-01')!
 
   it('removes answer keys from assessment lessons only', () => {
@@ -41,6 +43,16 @@ describe('redactAssessmentKeys', () => {
     if (blank.type === 'fill_blank') {
       expect(isAnswerComplete(blank, { type: 'fill_blank', values: blank.blanks.map(() => 'x') })).toBe(true)
     }
+  })
+
+  it('ships only redacted assessment keys to the app (generated client content, non-preview build)', () => {
+    const client = JSON.parse(CLIENT_CURRICULUM_JSON) as { id: string; lessons: { kind: string; exercises: unknown[] }[] }[]
+    expect(client).toHaveLength(CURRICULUM.length)
+    const parsed = redactAssessmentKeys(CURRICULUM)
+    expect(client).toEqual(JSON.parse(JSON.stringify(parsed)))
+    // Under vitest VITE_UI_PREVIEW is unset, so the app curriculum is the redacted one.
+    const appAssessment = APP_CURRICULUM.find((c) => c.id === 'a0-01')!.lessons.find((l) => l.kind === 'assessment')!
+    expect(appAssessment.exercises.filter((e) => e.type === 'multiple_choice').every(isRedacted)).toBe(true)
   })
 
   it('leaves the original curriculum untouched', () => {

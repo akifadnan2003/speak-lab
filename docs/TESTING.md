@@ -74,7 +74,7 @@ CI); bump it on purpose with a green `database` job, not through `latest`.
 
 ## 4. What is covered today
 
-Unit / integration (174 tests): utils, env (incl. preview refusal when configured), theme store,
+Unit / integration (175 tests): utils, env (incl. preview refusal when configured), theme store,
 nav, button/dialog/tabs, router (production fail-closed, preview mode, real-configured routes),
 `auth-url` capture/scrub, `AuthProvider` state machine with a fake client (session, disabled,
 missing profile, SIGNED_OUT, verifyOtp success, expired link, local-data purge on sign-out and

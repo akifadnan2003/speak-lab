@@ -23,7 +23,7 @@ endpoints, a revoked student with a still-open session.
 | Validate everything | Zod on the client and in the Edge Function; database `CHECK` constraints; email normalised to lowercase. |
 | Audit the lifecycle | `account_events`: account created, invitation sent/resent/revoked/accepted, disabled/reactivated, owner bootstrapped. No tokens or secrets are stored. |
 | Revocation is server-side | Disable = `status = 'disabled'` + Auth ban. RLS denies immediately; refresh and sign-in are refused. Not merely a local sign-out. |
-| Assessments are graded server-side | `assessment_attempts` is written only by the `assessment` Edge Function (service role); clients have SELECT. The function verifies the caller, recomputes the chapter gate from the database, grades raw answers with the shared engine copy, enforces 3 attempts per chapter version and a 2 h attempt expiry, and discloses correct answers only after a pass or on the last attempt. Chapter completion requires a passed attempt, so no client write completes a chapter. Assessment answer keys are redacted from the bundle. |
+| Assessments are graded server-side | `assessment_attempts` is written only by the `assessment` Edge Function (service role); clients have SELECT. The function verifies the caller, recomputes the chapter gate from the database, grades raw answers with the shared engine copy, enforces 3 attempts per chapter version and a 2 h attempt expiry, and discloses correct answers only after a pass or on the last attempt. Chapter completion requires a passed attempt, so no client write completes a chapter. Real builds ship a generated curriculum with assessment answer keys removed (`npm run sync:content`); the full content exists only in preview builds and in the function's copy. |
 | Nothing of a student stays on a shared device | `src/lib/local-data.ts`: sign-out, the SIGNED_OUT event and a change of the active user id purge every `speaklab.*` storage key except the theme and the auth session, run registered feature cleaners (M3 registers `clearStoredProgress`), delete `speaklab*` IndexedDB databases and clear the TanStack Query cache. The profile query of a new user waits for this purge. |
 
 ## 3. Authorization rules (as implemented in `supabase/migrations/20261103120000_identity_and_access.sql`)
@@ -110,8 +110,9 @@ answer key. Every submission and reset is logged in `account_events`.
    chapter completion and everything downstream depend on the server-graded attempt.
 7. **Some answer keys are inherent to the exercise.** Sentence-ordering tokens and matching pairs
    are the answer, presented shuffled; speaking prompts are self-checked. Multiple choice, blanks,
-   corrections, transformations and writing checklists have their keys removed from the bundle for
-   assessment lessons. A determined learner could still read the two inherent kinds from the page.
+   corrections, transformations and writing checklists have their keys removed from the generated
+   client curriculum (real builds never import the full content module; the preview build does).
+   A determined learner could still read the two inherent kinds from the page.
 8. **Attempt expiry is wall-clock based** (2 h). The function voids an expired open attempt on the
    next start; it does not count against the three attempts.
 

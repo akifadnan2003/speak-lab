@@ -19,7 +19,9 @@ const SRC = path.join(root, 'src', 'features')
 const OUT = path.join(root, 'supabase', 'functions', '_shared', 'features')
 const SOURCES = [
   'curriculum/schema',
-  'curriculum/content',
+  'curriculum/content/authoring.ts',
+  'curriculum/content/curriculum-map.ts',
+  'curriculum/content/chapters',
   'curriculum/ports.ts',
   'curriculum/progression.ts',
   'curriculum/assessment-rules.ts',
