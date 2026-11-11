@@ -23,6 +23,7 @@ endpoints, a revoked student with a still-open session.
 | Validate everything | Zod on the client and in the Edge Function; database `CHECK` constraints; email normalised to lowercase. |
 | Audit the lifecycle | `account_events`: account created, invitation sent/resent/revoked/accepted, disabled/reactivated, owner bootstrapped. No tokens or secrets are stored. |
 | Revocation is server-side | Disable = `status = 'disabled'` + Auth ban. RLS denies immediately; refresh and sign-in are refused. Not merely a local sign-out. |
+| Assessments are graded server-side | `assessment_attempts` is written only by the `assessment` Edge Function (service role); clients have SELECT. The function verifies the caller, recomputes the chapter gate from the database, grades raw answers with the shared engine copy, enforces 3 attempts per chapter version and a 2 h attempt expiry, and discloses correct answers only after a pass or on the last attempt. Chapter completion requires a passed attempt, so no client write completes a chapter. Assessment answer keys are redacted from the bundle. |
 | Nothing of a student stays on a shared device | `src/lib/local-data.ts`: sign-out, the SIGNED_OUT event and a change of the active user id purge every `speaklab.*` storage key except the theme and the auth session, run registered feature cleaners (M3 registers `clearStoredProgress`), delete `speaklab*` IndexedDB databases and clear the TanStack Query cache. The profile query of a new user waits for this purge. |
 
 ## 3. Authorization rules (as implemented in `supabase/migrations/20261103120000_identity_and_access.sql`)
@@ -37,6 +38,10 @@ Helper functions (`SECURITY DEFINER`, `STABLE`, `search_path = ''`, executable b
 | `tutor_students` | active participants (tutor or the student) | never | never (trigger on invitation acceptance) |
 | `invitations` | active tutor, own invitations | never | never (Edge Function with service role) |
 | `account_events` | active user: own rows; tutor: linked students and invitees | never | never (triggers / function) |
+| `lesson_progress` (M3) | own rows; tutor → linked students | own rows when active | INSERT own rows when active; never DELETE |
+| `exercise_attempts` (M3) | own rows; tutor → linked students | never | INSERT own rows when active (client id = idempotency key) |
+| `chapter_access_overrides` (M3) | own rows; tutor → linked students | never | tutor INSERT/DELETE for linked students only (audited) |
+| `assessment_attempts` (M3) | own rows; tutor → linked students | never | never from clients (Edge Function `assessment` with service role) |
 
 `bootstrap_owner(uuid)`: refuses client callers, requires an existing **confirmed** Auth user,
 returns `already-owner` for the existing tutor, raises for any other id when a tutor exists.
@@ -60,6 +65,16 @@ event; keep `profiles.email` in sync.
   its own redirect allow-list on top.
 - Secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` /
   `SUPABASE_SECRET_KEYS` are injected by the platform. Nothing is read from the request.
+
+## 4b. Edge Function `assessment` (M3)
+
+Same verification as `student-admin` (bearer JWT → `auth.getUser()` → active profile in the
+database). `start` and `submit` require the student role; `reset` requires the tutor and a
+`tutor_students` link. The chapter gate is recomputed from `lesson_progress`,
+`chapter_access_overrides` and submitted `assessment_attempts` with the same `computeProgression`
+the app uses, so a locked check cannot be started by URL. Answers are validated with the shared
+Zod `AnswerSchema`; unknown or mistyped answers grade as empty. Stored `results` never contain the
+answer key. Every submission and reset is logged in `account_events`.
 
 ## 5. Authentication flow on GitHub Pages
 
@@ -90,10 +105,15 @@ event; keep `profiles.email` in sync.
 5. **Recovery before onboarding.** A student who abandons onboarding after verifying the invitation
    has a session but no password; they can still use *Forgot password*. Onboarding resumes on the
    next visit.
-6. **Assessment integrity is not a client concern.** Any attempt/retake record kept in the browser
-   (M3's localStorage repository) is convenience data only. Placement and assessment results count
-   only once they are written server-side under the student's own RLS-protected rows (M3
-   integration); the server decides what a retake is.
+6. **Practice progress is self-reported.** `lesson_progress` and `exercise_attempts` for practice
+   lessons are written by the learner's own client. They unlock the chapter check, nothing more:
+   chapter completion and everything downstream depend on the server-graded attempt.
+7. **Some answer keys are inherent to the exercise.** Sentence-ordering tokens and matching pairs
+   are the answer, presented shuffled; speaking prompts are self-checked. Multiple choice, blanks,
+   corrections, transformations and writing checklists have their keys removed from the bundle for
+   assessment lessons. A determined learner could still read the two inherent kinds from the page.
+8. **Attempt expiry is wall-clock based** (2 h). The function voids an expired open attempt on the
+   next start; it does not count against the three attempts.
 
 ## 7. AI endpoints (M7)
 

@@ -34,11 +34,17 @@ Supabase operations (setup, bootstrap, deploy, rollback): `docs/SUPABASE_SETUP.m
 - Anything kept on the device for a student (progress cache, drafts, offline queue) uses a
   `speaklab.` storage prefix or registers a cleaner in `src/lib/local-data.ts`, so sign-out and
   account switching purge it.
+- Chapter checks are graded only by the `assessment` Edge Function; `assessment_attempts` is never
+  written by clients and clients never submit scores. Practice progress is the learner's own rows.
+- `supabase/functions/_shared/features/**` is generated from `src/features` by
+  `npm run sync:functions`; never edit it by hand, and run the sync after changing schemas, content,
+  the grading engine, progression or `assessment-rules.ts` (CI checks it).
 
 ## Commands
 
 `npm run dev` · `npm run typecheck` · `npm run lint` · `npm run test` · `npm run test:e2e` ·
-`npm run build` · `npm run check` (all of the first four plus build).
+`npm run build` · `npm run sync:functions` (regenerate the Edge Function's shared copy) ·
+`npm run check` (typecheck, lint, sync check, test, build).
 With Docker: `npx supabase start` · `npm run test:db` (RLS/lifecycle) · `npm run test:e2e:auth`.
 
 Never claim a check passed without running it. Never delete a meaningful test to make CI green.

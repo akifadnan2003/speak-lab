@@ -1,6 +1,6 @@
 # SpeakLab — Testing Strategy
 
-Last updated for milestone M2 (2026-11-11).
+Last updated for milestone M3 integration (2026-11-11).
 
 ## 1. Layers
 
@@ -10,7 +10,7 @@ Last updated for milestone M2 (2026-11-11).
 | Lint | oxlint (correctness errors, React compiler rules) | `src`, `e2e`, `supabase/tests` | local, CI |
 | Unit / integration | Vitest 5 + Testing Library + jsdom | `src/**/*.test.ts(x)` | local, CI |
 | End-to-end (shell) | Playwright 1.64, Chromium desktop + Pixel 7, **preview build** | `e2e/shell.spec.ts` | local, CI |
-| Authorization & lifecycle | Vitest (node) against a **local Supabase stack** (Postgres + RLS, GoTrue, Edge Function, Mailpit) | `supabase/tests/*.test.ts` | CI (`database` job); local with Docker |
+| Authorization, lifecycle & learning records | Vitest (node) against a **local Supabase stack** (Postgres + RLS, GoTrue, Edge Functions, Mailpit) | `supabase/tests/*.test.ts` | CI (`database` job); local with Docker |
 | End-to-end (real auth) | Playwright against the production bundle built for the **local Supabase stack**; real emails from Mailpit | `e2e/auth.spec.ts` | CI (`database` job); local with Docker |
 | Manual device pass | Real iPhone Safari, Android Chrome, Windows Edge/Chrome/Firefox | checklist below | each milestone |
 
@@ -55,9 +55,26 @@ CI); bump it on purpose with a green `database` job, not through `latest`.
 | 14 | GitHub Pages redirects work | `auth-url.test.ts` (token_hash / code / implicit / error parsing and URL scrubbing); `auth.spec.ts` opens the emailed URL with query-before-hash exactly as delivered |
 | 15 | Refreshing a protected route does not break the app | `shell.spec.ts` deep hash refresh; `auth.spec.ts` reload on `/settings` keeps the session |
 
+## 3b. M3 integration coverage
+
+| Requirement | Where it is proven |
+| --- | --- |
+| Student-specific progress isolation | `progress.test.ts` "isolation" (RLS: read own only, forged rows refused); `supabase.test.ts` (every read scoped by student id) |
+| Tutor visibility | `progress.test.ts` "tutor visibility" (linked students readable, unlinked not, no tutor writes to progress); `auth.spec.ts` Curriculum tab |
+| Locked chapter access | `progress.test.ts` (function refuses `locked`); `LessonWorkspacePage.test.tsx` locked check; `auth.spec.ts` URL to the locked check |
+| Unauthorized assessment updates | `progress.test.ts` (direct insert/update to `assessment_attempts` denied, forged `lesson_progress` for the assessment ignored, other student cannot submit) |
+| Server-side grading and disclosure | `progress.test.ts` (score computed from raw answers, no `correctAnswer` after a fail, revealed after a pass); `persistence.test.ts` memory gateway as reference |
+| Cross-device progress | `progress.test.ts` second signed-in client; `auth.spec.ts` device 2 sees device 1's progress |
+| Sign-out cleanup | `local-cleanup.test.ts` (registered cleaner wipes progress); `AuthProvider.test.tsx` |
+| Account switching | `local-cleanup.test.ts` (`activateLocalUser` purge; preview id never imported) |
+| Assessment retakes | `progress.test.ts` (3 attempts, `retakes_exhausted`, tutor reset, stranger refused); `persistence.test.ts` |
+| Idempotency | `progress.test.ts` (same attempt id twice, start twice, submit twice) |
+| Mobile and desktop lesson navigation | `auth.spec.ts` runs on Desktop Chrome and Pixel 7 projects; `shell.spec.ts` preview build |
+| Shared function code in sync | `npm run sync:functions:check` in CI |
+
 ## 4. What is covered today
 
-Unit / integration (69 tests): utils, env (incl. preview refusal when configured), theme store,
+Unit / integration (174 tests): utils, env (incl. preview refusal when configured), theme store,
 nav, button/dialog/tabs, router (production fail-closed, preview mode, real-configured routes),
 `auth-url` capture/scrub, `AuthProvider` state machine with a fake client (session, disabled,
 missing profile, SIGNED_OUT, verifyOtp success, expired link, local-data purge on sign-out and
@@ -100,8 +117,8 @@ End-to-end (34 tests across two projects):
 Shell e2e (32 tests, two projects): unchanged from M1 (manifest, deep links, navigation,
 exercise keyboard use, role isolation, dialogs, theme, overflow at 7 widths).
 
-Database + real-auth (CI `database` job): 21 integration tests and 5 browser scenarios (10 test
-runs across two projects) listed above.
+Database + real-auth (CI `database` job): 21 + 10 integration tests (`auth-rls.test.ts`,
+`progress.test.ts`) and 6 browser scenarios (12 test runs across the desktop and Pixel 7 projects).
 
 ## 5. Conventions
 

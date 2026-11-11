@@ -5,6 +5,10 @@ Last updated for milestone M3 (2026-11-03). The sequencing below is encoded as v
 `src/features/curriculum/content/chapters/`. This document stays the human-readable source of truth
 and must change together with the map (`curriculum.test.ts` checks counts and ordering).
 
+> **M3 integration (2026-11-11).** A0-01 and A2-07 are authored; every other chapter is
+> `planned`. Chapter checks are graded by the `assessment` Edge Function (ADR-015); placement is
+> expressed as tutor overrides (ADR-016).
+>
 > **M3 sequencing correction (2026-11-03).** Implementation starts with a proper **A0/A1
 > foundation chapter** before any A2 material. The A2 Past Continuous chapter is the exercise-engine
 > showcase, reached through placement-based acceleration, not the default starting point. Every

@@ -7,7 +7,7 @@ Last updated 2026-11-11. Status legend: ✅ done · 🔄 in progress · ⏳ plan
 | M0 | Repository, architecture, documentation, commands, test strategy | ✅ |
 | M1 | Application foundation and design system | ✅ |
 | M2 | Authentication, authorization and student invitations | ✅ (live in production 2026-11-11) |
-| M3 | Curriculum and exercise engine | 🔄 integrating the standalone engine into the authenticated app |
+| M3 | Curriculum and exercise engine | 🔄 integration built on `m3-integration`, PR open |
 | M4 | Vocabulary and revision | ⏳ |
 | M5 | Student progress | ⏳ |
 | M6 | Tutor dashboard | ⏳ |
@@ -68,60 +68,55 @@ Owner actions still open (see `docs/SUPABASE_SETUP.md`):
    students from the dashboard and link them with the `tutor_students` insert (§3).
 2. Complete the manual device checklist in `docs/TESTING.md` §6.
 
-## M3 — Curriculum and Exercise Engine 🔄
+## M3 — Curriculum and Exercise Engine 🔄 (integration in review)
 
-Design: `docs/superpowers/specs/2026-11-03-m3-curriculum-engine-design.md`.
+Designs: `docs/superpowers/specs/2026-11-03-m3-curriculum-engine-design.md` (standalone engine,
+Agent 2) and `docs/superpowers/specs/2026-11-11-m3-integration-design.md` (integration into the
+authenticated app, Agent 1, branch `m3-integration`).
 
-Done (frontend-independent slice, branch `worktree-m3-curriculum`):
+Delivered by the standalone slice (merged from `worktree-m3-curriculum`, 712feec):
 
 - [x] Zod schemas for chapters, lessons, content blocks and nine exercise types; curriculum-level
       validation (unique ids, prerequisites exist, no cycles)
 - [x] Full A0 → C1 map (70 chapters) with objectives, skills and prerequisites; planned chapters
       shown honestly as "not written yet"
 - [x] Exercise engine: deterministic grading with partial credit, text normalisation, hints,
-      explanations (EN + optional AZ), three-attempt practice / one-attempt assessment session
-      reducer, seeded shuffling
-- [x] Components: multiple choice, fill-in-the-blank (word bank), sentence ordering (tap + arrow
-      keys), error correction, matching (tap-tap), question formation, sentence transformation,
-      speaking prompt (self-checked, clearly labelled), guided writing (checklist), runner with
-      summary; keyboard and touch accessible, 320px-safe
-- [x] Chapter A0-01 fully authored: 11 lessons, 130+ exercises, 18+ speaking prompts, Azerbaijani
+      explanations (EN + optional AZ), three-attempt practice session reducer, seeded shuffling
+- [x] Components for every exercise type; runner with summary; keyboard and touch accessible
+- [x] Chapter A0-01 fully authored: 11 lessons, 130+ exercises, 20 speaking prompts, Azerbaijani
       mechanism explanations
 - [x] Progression rules (unlock, assessment gating, chapter completion, tutor override model)
-- [x] `ContentSource` / `ProgressRepository` ports with static content + localStorage progress
-      (device-only, labelled in the UI); Learn, Chapter and Lesson screens and the Home "Continue"
-      card run on the real engine
-- [x] 71 new unit/component tests; e2e updated
 
-Remaining for M3 (needs M2 and backend work):
+Delivered by the integration:
 
-- Supabase `ProgressRepository` and versioned `lesson_content` tables; tutor unlock/skip UI (M6)
-- Listening/dictation exercise types (need audio) and placement assessment content
-- Further chapters (A0-02 onward) authored with the same schemas
+- [x] Migration `20261111150000_curriculum_progress.sql`: `lesson_progress`, `exercise_attempts`
+      (client id = idempotency key), `chapter_access_overrides`, `assessment_attempts`; RLS per
+      student with tutor read through `tutor_students`; audit events for overrides and assessments
+- [x] Supabase `ProgressRepository` and `AssessmentGateway` behind the M3 ports; preview builds keep
+      the localStorage pair; `storage` label tells the learner where progress lives
+- [x] Edge Function `assessment`: server-side grading from the shared engine/content copy, chapter
+      gate computed from the database, 3 attempts per chapter version, 2 h attempt expiry,
+      idempotent start/submit, answer disclosure only after a pass or on the last attempt, tutor
+      reset; assessment answer keys redacted from the bundle
+- [x] Lesson workspace: chapter checks start an attempt, save answers without feedback, submit for
+      server grading and show the server's verdict; practice lessons unchanged
+- [x] Tutor: Curriculum tab on the student profile with real progression, unlock / skip / clear
+      overrides, "Place at level", per-assessment attempts and "Allow retake"
+- [x] `clearStoredProgress` registered with the M2 local-data cleanup (sign-out, SIGNED_OUT,
+      account switch); preview progress never reaches a real account
+- [x] A2-07 "Past Continuous; when / while; interrupted actions" authored (the M1 showcase
+      content) at its real place in the map, reachable by completing A2-06 or by placement
+- [x] Tests: unit (rules, redaction, reducer, repositories, runner, lesson page, cleanup),
+      database integration (`supabase/tests/progress.test.ts`), real-auth browser flow
+      (lesson navigation on desktop and mobile, cross-device progress, locked chapter check, tutor
+      placement)
 
-**Integration notes for the standalone M3 work (branch `worktree-m3-curriculum`):**
+Remaining for M3 after this integration:
 
-- Register the localStorage repository's `clearStoredProgress()` with
-  `registerLocalDataCleaner()` from `src/lib/local-data.ts` so sign-out and account switching
-  wipe it (the auth provider already purges every `speaklab.*` key and IndexedDB database).
-- Persist progress, attempts and assessment results to Supabase under the student's own rows
-  (RLS: `student_id = auth.uid()`, tutor read via `tutor_students`); local storage becomes a cache
-  or offline queue with client-generated idempotency keys, never the source of truth.
-- Assessment integrity (retake limits, timing, answer validation) is enforced server-side in that
-  integration; the current localStorage retake record cannot guarantee it.
-- M3 is not merged until M2 is verified independently.
-
-**Correction carried into M3:** the learning journey must start from zero. M3 begins with a
-proper **A0/A1 foundation chapter** (alphabet and sounds, greetings, *to be*, *have got*,
-numbers, present simple basics) before any A2 content. The A2 Past Continuous chapter remains
-the showcase of the exercise engine but is reached through placement: the placement assessment
-and tutor overrides accelerate advanced students past the foundation chapters rather than
-starting everyone at A2.
-
-Scope: versioned content tables and Zod schemas; chapter/lesson/exercise renderer for the 20
-exercise types with deterministic grading; attempts and progress persistence (RLS per student);
-unlock/skip overrides; one fully functional A0/A1 foundation chapter and the A2 Past Continuous
-chapter; placement assessment skeleton; tutor curriculum view driven by real data.
+- Deploy: run the manual backend workflow (migration + both functions) after the PR merges.
+- Listening/dictation exercise types (need audio) and placement assessment content.
+- Further chapters (A0-02 onward) authored with the same schemas.
+- Versioned `lesson_content` tables and the tutor content editor (M6).
 
 ## M4 — Vocabulary and Revision ⏳
 
