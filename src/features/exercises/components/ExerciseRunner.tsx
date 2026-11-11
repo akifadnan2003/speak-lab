@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, Lightbulb, Loader2, Lock, RotateCcw, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -94,11 +94,21 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
   const serverGraded = isAssessment && !!assessment
   const hintOpen = !!exercise && hintFor === exercise.id
 
-  /** Navigate and move focus to the exercise heading so screen readers announce the change. */
+  /**
+   * Navigate and move focus to the exercise heading so screen readers announce the change. The
+   * focus happens in an effect after the new exercise rendered (not in a rAF, which could fire
+   * while the learner is already typing into the next exercise on a slow device).
+   */
+  const focusHeadingAfterNavigation = useRef(false)
   const go = useCallback((action: Extract<SessionAction, { type: 'next' | 'prev' }>) => {
+    focusHeadingAfterNavigation.current = true
     dispatch(action)
-    requestAnimationFrame(() => headingRef.current?.focus({ preventScroll: true }))
   }, [])
+  useEffect(() => {
+    if (!focusHeadingAfterNavigation.current) return
+    focusHeadingAfterNavigation.current = false
+    headingRef.current?.focus({ preventScroll: true })
+  }, [session.index])
 
   const finish = useCallback(() => {
     if (!allAnswered(session)) return
