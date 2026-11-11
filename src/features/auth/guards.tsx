@@ -1,33 +1,62 @@
-import { Navigate, Outlet, useLocation } from 'react-router'
+import { useEffect } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 import { FullPageLoader } from '@/components/feedback/FullPageLoader'
 import { useAuth } from './AuthProvider'
+import { AuthErrorScreen } from './AuthErrorScreen'
 import type { UserRole } from './types'
 
 /**
- * Route guards. Both fail closed: when there is no authenticated session the
- * user is sent to the login screen, and when the role does not match they are
- * sent to their own home. These guards are a UX layer only; real enforcement
- * happens in Row Level Security and Edge Functions (M2).
+ * Redirect that re-fires on every location change. React Router's built-in redirect component
+ * only re-runs its effect when the *target* changes, so a guard element that stays mounted across
+ * two quick navigations (e.g. /tutor then /tutor/students/x) would silently stop redirecting and
+ * leave a blank screen at the protected URL. Keying on the pathname closes that gap.
+ */
+export function Redirect({ to }: { to: string }) {
+  const navigate = useNavigate()
+  // `location.key` is "default" for browser-initiated hash navigations, so the pathname is the
+  // dependency that actually changes between two protected URLs.
+  const { pathname } = useLocation()
+  useEffect(() => {
+    navigate(to, { replace: true })
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- `pathname` is the intended trigger
+  }, [navigate, to, pathname])
+  return null
+}
+
+/**
+ * Route guards. All fail closed: no session → login; wrong role → the user's own home;
+ * profile unavailable → an error screen with sign-out. They are a UX layer; the real
+ * enforcement is Row Level Security and the Edge Function role check.
  */
 export function RequireAuth() {
   const { state } = useAuth()
-  const location = useLocation()
 
   if (state.status === 'loading') return <FullPageLoader label="Checking your session" />
+  if (state.status === 'error') return <AuthErrorScreen message={state.message} />
   if (state.status !== 'authenticated') {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    return <Redirect to="/login" />
   }
   if (state.user.status === 'disabled') {
-    return <Navigate to="/account-disabled" replace />
+    return <Redirect to="/account-disabled" />
+  }
+  return <Outlet />
+}
+
+/** Students must finish onboarding (password + preferences) before using the app shell. */
+export function RequireOnboarded() {
+  const { state } = useAuth()
+  if (state.status !== 'authenticated') return <Redirect to="/login" />
+  if (state.user.role === 'student' && !state.user.onboardingCompletedAt) {
+    return <Redirect to="/welcome" />
   }
   return <Outlet />
 }
 
 export function RequireRole({ role }: { role: UserRole }) {
   const { state } = useAuth()
-  if (state.status !== 'authenticated') return <Navigate to="/login" replace />
+  if (state.status !== 'authenticated') return <Redirect to="/login" />
   if (state.user.role !== role) {
-    return <Navigate to={homePathFor(state.user.role)} replace />
+    return <Redirect to={homePathFor(state.user.role)} />
   }
   return <Outlet />
 }
@@ -35,8 +64,10 @@ export function RequireRole({ role }: { role: UserRole }) {
 /** Redirects a signed-in user away from auth screens. */
 export function RedirectIfAuthenticated() {
   const { state } = useAuth()
+  if (state.status === 'loading') return <FullPageLoader label="Checking your session" />
   if (state.status === 'authenticated') {
-    return <Navigate to={homePathFor(state.user.role)} replace />
+    if (state.user.status === 'disabled') return <Redirect to="/account-disabled" />
+    return <Redirect to={homePathFor(state.user.role)} />
   }
   return <Outlet />
 }

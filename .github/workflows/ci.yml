@@ -12,10 +12,12 @@ concurrency:
 permissions:
   contents: read
 
+# Runner image pinned to ubuntu-24.04 (LTS) so the browser suites run on a known image; bump it
+# deliberately with a green run rather than through `ubuntu-latest`.
 jobs:
   verify:
     name: Typecheck, lint, unit tests, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,8 +36,8 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: End-to-end (Playwright)
-    runs-on: ubuntu-latest
+    name: End-to-end shell (Playwright, preview build)
+    runs-on: ubuntu-24.04
     needs: verify
     timeout-minutes: 20
     steps:
@@ -45,7 +47,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium (system packages when apt is reachable, browser only otherwise)
+        # `--with-deps` runs apt-get; on 2026-11-11 the runners' Ubuntu mirror stopped resolving on
+        # every image and only font packages were missing. Chromium's libraries ship with the
+        # runner image, so fall back to the browser download alone instead of failing the suite.
+        run: |
+          npx playwright install --with-deps chromium             || { echo "::warning::apt unreachable, installing the browser without system packages"; npx playwright install chromium; }
       - run: npm run test:e2e
         env:
           CI: true
@@ -55,3 +62,62 @@ jobs:
           name: playwright-report
           path: playwright-report
           retention-days: 7
+
+  database:
+    name: Database policies, Edge Function and real-auth e2e (local Supabase)
+    runs-on: ubuntu-24.04
+    needs: verify
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Pinned to the version the database suite is proven on. 3.1.0 changed how the local stack
+      # serves `content_path` email templates to the auth container (supabase/cli#7527) and the
+      # invite email arrived with the built-in template (no token_hash) on GitHub-hosted runners.
+      # Bump deliberately, with a green `database` job, never via `latest`.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+      - name: Start local Supabase (applies supabase/migrations, serves Edge Functions, captures email)
+        run: supabase start -x studio,imgproxy,logflare,vector
+      - name: Export local credentials for the tests
+        run: |
+          supabase status -o json > /tmp/status.json
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync("/tmp/status.json", "utf8"));
+            const pick = (...k) => k.map((x) => s[x]).find(Boolean) ?? "";
+            const out = {
+              SUPABASE_URL: pick("API_URL"),
+              SUPABASE_ANON_KEY: pick("ANON_KEY", "PUBLISHABLE_KEY"),
+              SUPABASE_SERVICE_ROLE_KEY: pick("SERVICE_ROLE_KEY", "SECRET_KEY"),
+              MAILPIT_URL: pick("MAILPIT_URL", "INBUCKET_URL") || "http://127.0.0.1:54324",
+            };
+            for (const [k, v] of Object.entries(out)) { if (!v) throw new Error("missing " + k); }
+            require("fs").appendFileSync(process.env.GITHUB_ENV, Object.entries(out).map(([k, v]) => `${k}=${v}`).join("\n") + "\n");
+            console.log("::add-mask::" + out.SUPABASE_SERVICE_ROLE_KEY);
+          '
+      - name: Authorization and lifecycle integration tests
+        run: npm run test:db
+      - name: Install Chromium (system packages when apt is reachable, browser only otherwise)
+        # `--with-deps` runs apt-get; on 2026-11-11 the runners' Ubuntu mirror stopped resolving on
+        # every image and only font packages were missing. Chromium's libraries ship with the
+        # runner image, so fall back to the browser download alone instead of failing the suite.
+        run: |
+          npx playwright install --with-deps chromium             || { echo "::warning::apt unreachable, installing the browser without system packages"; npx playwright install chromium; }
+      - name: Real-auth end-to-end (invite, recovery, disable, logout, refresh)
+        run: npm run test:e2e:auth
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-auth
+          path: playwright-report-auth
+          retention-days: 7
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

@@ -1,0 +1,114 @@
+name: Supabase backend (manual)
+
+# Backend changes are NEVER applied by a frontend push. This workflow is started by hand from the
+# Actions tab (or `gh workflow run supabase-deploy.yml`). It is additive only: `supabase db push`
+# applies migrations that the hosted project has not seen yet and refuses anything else.
+#
+# Supabase CLI 3.x targets the LOCAL stack by default, so every database command below passes
+# `--remote=<url>`, and every hosted change (db push, functions deploy, secrets set) passes
+# `--yes` because the runner has no terminal to confirm on. GitHub-hosted runners are IPv4-only
+# and the direct database endpoint is IPv6, so the URL is the project's shared *Session pooler*
+# (port 5432), which is IPv4-reachable.
+# Nothing here ever starts a local stack.
+#
+# Required repository secrets (least privilege, never exposed to the frontend build):
+#   SUPABASE_ACCESS_TOKEN  personal access token used by the CLI (link, functions, secrets)
+#   SUPABASE_PROJECT_REF   the project ref (subdomain of the project URL)
+#   SUPABASE_DB_URL        Session pooler connection string from Dashboard > Connect > Session pooler,
+#                          with the database password filled in (URL-encode special characters):
+#                          postgresql://postgres.<ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres
+#   SUPABASE_DB_PASSWORD   kept for `supabase link` validation; not used for migrations any more
+# Secrets are read only from environment variables so their values are masked in the logs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      migrations:
+        description: Apply pending database migrations (supabase db push)
+        type: boolean
+        default: true
+      functions:
+        description: Deploy Edge Functions
+        type: boolean
+        default: true
+      dry_run:
+        description: Show what would change without applying it
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-backend
+  cancel-in-progress: false
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    environment: supabase-production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      # Same pin as ci.yml: the version whose `--remote`, `--yes` and deploy behaviour was verified.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+      - name: Check the database connection secret (value is never printed)
+        # Parsed with a real URL parser, not a pattern match, so the host that will actually be
+        # dialled is the one being checked (a query string or userinfo cannot smuggle a host).
+        run: |
+          python3 - <<'PY'
+          import os, re, sys, urllib.parse as u
+          url = os.environ.get('SUPABASE_DB_URL', '')
+          ref = os.environ.get('SUPABASE_PROJECT_REF', '')
+          if not url:
+              print('::error::Repository secret SUPABASE_DB_URL is missing. Copy the Session pooler string from Dashboard > Connect.')
+              sys.exit(1)
+          p = u.urlparse(url)
+          problems = []
+          if p.scheme not in ('postgresql', 'postgres'): problems.append('scheme must be postgresql://')
+          if p.username != f'postgres.{ref}': problems.append('user must be postgres.<project ref> for the linked project')
+          host = (p.hostname or '').rstrip('.').lower()
+          if not re.fullmatch(r'aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com', host): problems.append('host must be the Session pooler (aws-<n>-<region>.pooler.supabase.com)')
+          authority = p.netloc
+          hostpart = authority.rsplit('@', 1)[-1]
+          if authority.count('@') != 1 or any(c in authority for c in ',[]') or re.search(r'\s', authority) or '%' in hostpart: problems.append('authority must be user:password@host:port with a single host and no options')
+          try:
+              port = p.port
+          except ValueError:
+              port = None
+          if port != 5432: problems.append('port must be 5432 (Session pooler, not Transaction pooler)')
+          if p.path != '/postgres' or p.query or p.fragment or p.params: problems.append('path must be /postgres with no query string')
+          if not p.password: problems.append('password is missing')
+          if problems:
+              print('::error::SUPABASE_DB_URL is not the Session pooler string for this project: ' + '; '.join(problems))
+              sys.exit(1)
+          print('Session pooler URL for the linked project: OK')
+          PY
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+      - name: Pending migrations (hosted project via Session pooler)
+        run: supabase migration list --remote="$SUPABASE_DB_URL"
+      - name: Apply migrations (additive, hosted project via Session pooler)
+        if: ${{ inputs.migrations && !inputs.dry_run }}
+        run: supabase db push --remote="$SUPABASE_DB_URL" --yes
+      - name: Migrations dry run (hosted project via Session pooler)
+        if: ${{ inputs.migrations && inputs.dry_run }}
+        run: supabase db push --remote="$SUPABASE_DB_URL" --dry-run
+      - name: Deploy Edge Functions
+        if: ${{ inputs.functions && !inputs.dry_run }}
+        run: supabase functions deploy student-admin --no-verify-jwt --yes
+      - name: Edge Function secrets
+        if: ${{ inputs.functions && !inputs.dry_run }}
+        run: |
+          supabase secrets set \
+            SPEAKLAB_ALLOWED_APP_URLS="https://akifadnan2003.github.io/speak-lab/,http://localhost:5173/speak-lab/" \
+            SPEAKLAB_INVITE_TTL_SECONDS="3600" \
+            --yes
+      - name: Migration state after deploy (hosted project via Session pooler)
+        run: supabase migration list --remote="$SUPABASE_DB_URL"

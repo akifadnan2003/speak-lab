@@ -5,6 +5,11 @@ Last updated for milestone M3 (2026-11-03). The sequencing below is encoded as v
 `src/features/curriculum/content/chapters/`. This document stays the human-readable source of truth
 and must change together with the map (`curriculum.test.ts` checks counts and ordering).
 
+> **M3 sequencing correction (2026-11-03).** Implementation starts with a proper **A0/A1
+> foundation chapter** before any A2 material. The A2 Past Continuous chapter is the exercise-engine
+> showcase, reached through placement-based acceleration, not the default starting point. Every
+> learner's journey begins at zero unless placement or the tutor says otherwise.
+
 ## 1. Teaching philosophy
 
 - **Speaking first.** Every chapter ends with spoken production; comprehension and production are

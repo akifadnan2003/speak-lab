@@ -124,3 +124,30 @@ describe('routing and guards (preview mode)', () => {
     expect(await screen.findByText('Page not found')).toBeInTheDocument()
   })
 })
+
+describe('routing (real auth configured, no session)', () => {
+  beforeEach(async () => {
+    mockEnv.env = { ...mockEnv.env, uiPreview: false, supabaseConfigured: true, supabaseUrl: 'https://example.supabase.co', supabaseAnonKey: 'sb_publishable_x' }
+    sessionStorage.clear()
+    localStorage.clear()
+    const { resetSupabaseClientForTests } = await import('@/lib/supabase/client')
+    resetSupabaseClientForTests()
+  })
+
+  it('the callback page explains that there is nothing to finish when opened without a link', async () => {
+    await renderAt('/auth/callback')
+    expect(await screen.findByRole('heading', { name: 'Nothing to finish' })).toBeInTheDocument()
+  })
+
+  it('onboarding and reset-password routes fail closed without a session', async () => {
+    const welcome = await renderAt('/welcome')
+    await screen.findByRole('heading', { name: 'Welcome back' })
+    expect(welcome.state.location.pathname).toBe('/login')
+  })
+
+  it('shows an enabled sign-in button and no "unconfigured" notice', async () => {
+    await renderAt('/login')
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeEnabled()
+    expect(screen.queryByTestId('auth-unconfigured')).not.toBeInTheDocument()
+  })
+})

@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-*
 dist-ssr
 *.local
 
@@ -37,3 +38,7 @@ blob-report
 
 # Supabase local
 supabase/.temp
+
+supabase/.branches
+playwright-report-auth
+.claude/worktrees

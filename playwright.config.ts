@@ -11,6 +11,8 @@ const BASE_PATH = '/speak-lab/'
  */
 export default defineConfig({
   testDir: './e2e',
+  // Real-auth flows live in playwright.auth.config.ts (needs the local Supabase stack).
+  testIgnore: /auth\.(spec|setup)\.ts$/,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
