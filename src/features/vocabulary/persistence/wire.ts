@@ -3,7 +3,7 @@ import type { VocabularySkill, VocabularyStage, VocabularyReviewRecord, Vocabula
 
 /**
  * Wire shapes for the vocabulary tables and functions in
- * `supabase/migrations/20261111150000_vocabulary_persistence.sql`.
+ * `supabase/migrations/20261112090000_vocabulary_persistence.sql`.
  *
  * Kept inside the vocabulary feature (not `src/lib/supabase/database.types.ts`) so this work does
  * not touch files the M3 integration is editing; they can be moved there afterwards.
