@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@/config/env'
+import type { CurriculumServices } from '@/features/curriculum/CurriculumProvider'
 import { PROGRESS_STORAGE_PREFIX } from '@/features/curriculum/persistence/local-storage'
 
 const mockEnv: { env: AppEnv } = {
@@ -13,19 +14,22 @@ vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({ needRefresh: [false, vi.fn()], updateServiceWorker: vi.fn() }),
 }))
 
-async function renderAt(path: string) {
+async function renderAt(path: string, services?: CurriculumServices) {
   const { createMemoryRouter, RouterProvider } = await import('react-router')
   const { routes } = await import('@/app/router')
   const { AuthProvider } = await import('@/features/auth/AuthProvider')
+  const { CurriculumProvider } = await import('@/features/curriculum/CurriculumProvider')
   const { TooltipProvider } = await import('@/components/ui/tooltip')
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
       <AuthProvider>
-        <TooltipProvider>
-          <RouterProvider router={router} />
-        </TooltipProvider>
+        <CurriculumProvider services={services}>
+          <TooltipProvider>
+            <RouterProvider router={router} />
+          </TooltipProvider>
+        </CurriculumProvider>
       </AuthProvider>
     </QueryClientProvider>,
   )
@@ -114,94 +118,91 @@ describe('Learn flow with the real curriculum (preview session)', () => {
   })
 })
 
-describe('Chapter check in the preview session (client gateway applying the server rules)', () => {
+describe('Chapter check (preview session; the client gateway applies the server rules)', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
   })
 
-  function unlockAssessment() {
-    // Every practice lesson of A0-01 done, so the chapter check is available.
-    localStorage.setItem(
-      `${PROGRESS_STORAGE_PREFIX}:preview-student-1`,
-      JSON.stringify({
-        lessonProgress: Array.from({ length: 10 }, (_, i) => ({
-          studentId: 'preview-student-1',
-          chapterId: 'a0-01',
-          lessonId: `a0-01-l${String(i + 1).padStart(2, '0')}`,
-          status: 'completed',
-          bestScore: 100,
-          completedAt: 'x',
-          updatedAt: 'x',
-        })),
-        attempts: [],
-        overrides: [],
-        assessments: [],
-      }),
-    )
+  /** A two-lesson chapter with a two-question check keeps the flow deterministic and fast. */
+  async function tinyServices(seedCompleted: boolean) {
+    const { parseChapter } = await import('@/features/curriculum/schema')
+    const { mc } = await import('@/features/curriculum/content/authoring')
+    const { createStaticContentSource } = await import('@/features/curriculum/content')
+    const { createMemoryAssessmentGateway, createMemoryProgressRepository, createMemoryStore } = await import('@/features/curriculum/persistence/memory')
+    const chapter = parseChapter({
+      id: 't-01',
+      level: 'A0',
+      number: 1,
+      title: 'Tiny chapter',
+      description: 'For tests.',
+      objectives: ['Test'],
+      skills: ['grammar'],
+      status: 'authored',
+      lessons: [
+        { id: 't-01-l01', title: 'Practice', kind: 'grammar', estimatedMinutes: 5, exercises: [mc('t-01-l01-e01', 'I ___', ['is', 'am'], 1)] },
+        {
+          id: 't-01-l02',
+          title: 'Chapter check',
+          kind: 'assessment',
+          estimatedMinutes: 5,
+          exercises: [mc('t-01-l02-e01', 'She ___', ['is', 'am'], 0), mc('t-01-l02-e02', 'They ___', ['are', 'is'], 0)],
+        },
+      ],
+    })
+    const chapters = [chapter]
+    const store = createMemoryStore()
+    if (seedCompleted) {
+      store.lessonProgress.push({ studentId: 'preview-student-1', chapterId: 't-01', lessonId: 't-01-l01', status: 'completed', bestScore: 100, completedAt: 'x', updatedAt: 'x' })
+    }
+    return {
+      store,
+      services: {
+        content: createStaticContentSource(chapters),
+        progress: createMemoryProgressRepository(store, undefined, chapters),
+        assessments: createMemoryAssessmentGateway(store, undefined, chapters),
+        storage: 'device' as const,
+      },
+    }
   }
 
-  it('starts an attempt, saves answers without feedback, submits and records the attempt (not as lesson progress)', async () => {
+  it('starts an attempt, saves answers without feedback, submits for grading and records the attempt (never as lesson progress)', async () => {
     const user = userEvent.setup()
-    unlockAssessment()
-    await renderAt('/learn/a0-01/lessons/a0-01-l11')
+    const { store, services } = await tinyServices(true)
+    await renderAt('/learn/t-01/lessons/t-01-l02', services)
     expect(await screen.findByRole('heading', { level: 1, name: 'Chapter check' })).toBeInTheDocument()
     expect(await screen.findByTestId('assessment-status')).toHaveTextContent('No attempts yet')
     await user.click(screen.getByTestId('start-assessment'))
-    expect(await screen.findByTestId('assessment-attempt')).toHaveTextContent('Attempt 1 of 3')
+    const runner = within(await screen.findByTestId('exercise-runner'))
+    expect(runner.getByTestId('assessment-attempt')).toHaveTextContent('Attempt 1 of 3')
 
-    // Walk through every exercise giving a minimal (mostly wrong) answer, then submit.
-    const total = Number(/of (\d+)/.exec(screen.getByText(/Exercise 1 of/).textContent ?? '')?.[1])
-    expect(total).toBeGreaterThan(5)
-    for (let i = 0; i < total; i++) {
-      // Scope every query to the runner: the app shell has its own radios (theme switch).
-      const runner = within(screen.getByTestId('exercise-runner'))
-      const check = runner.getByTestId('check-answer')
-      if ((check as HTMLButtonElement).disabled) {
-        const radio = runner.queryAllByRole('radio')[0]
-        if (radio) await user.click(radio)
-        for (const input of runner.queryAllByRole('textbox')) await user.type(input, 'x')
-        const pool = runner.queryByTestId('ordering-pool')
-        if (pool) {
-          const tokens = within(pool).getAllByRole('button').length
-          for (let k = 0; k < tokens; k++) {
-            const chip = within(pool).queryAllByRole('button').find((b) => !(b as HTMLButtonElement).disabled)
-            if (!chip) break
-            await user.click(chip)
-          }
-        }
-        const left = runner.queryByRole('group', { name: 'Left items' })
-        const right = runner.queryByRole('group', { name: 'Right items' })
-        if (left && right) {
-          const count = Math.min(within(left).getAllByRole('button').length, within(right).getAllByRole('button').length)
-          for (let k = 0; k < count; k++) {
-            await user.click(within(left).getAllByRole('button')[k]!)
-            await user.click(within(right).getAllByRole('button')[k]!)
-          }
-        }
-      }
-      await user.click(runner.getByTestId('check-answer'))
-      expect(runner.queryByTestId('exercise-feedback')).not.toBeInTheDocument()
-      expect(runner.getByRole('status')).toHaveTextContent('Answer saved')
-      const next = runner.queryByTestId('next-exercise')
-      if (next) await user.click(next)
-    }
-    const submit = screen.getByRole('button', { name: /Submit/ })
-    expect(submit).toBeEnabled()
-    await user.click(submit)
-    expect(await screen.findByTestId('summary-outcome')).toHaveTextContent(/Passed|Not passed yet/)
+    // Question 1 wrong, question 2 right; no feedback while answering.
+    await user.click(runner.getByRole('radio', { name: /am/ }))
+    await user.click(runner.getByTestId('check-answer'))
+    expect(runner.queryByTestId('exercise-feedback')).not.toBeInTheDocument()
+    expect(runner.getByRole('status')).toHaveTextContent('Answer saved')
+    await user.click(runner.getByTestId('next-exercise'))
+    await user.click(runner.getByRole('radio', { name: /are/ }))
+    await user.click(runner.getByTestId('check-answer'))
+    await user.click(runner.getByRole('button', { name: 'Submit' }))
+
+    expect(await screen.findByTestId('summary-outcome')).toHaveTextContent('Not passed yet')
+    expect(screen.getByTestId('summary-score')).toHaveTextContent('Score 50%')
     expect(screen.getByTestId('summary-attempts')).toHaveTextContent('2 attempts left')
+    expect(screen.getByTestId('answers-hidden')).toBeInTheDocument()
 
-    const stored = JSON.parse(localStorage.getItem(`${PROGRESS_STORAGE_PREFIX}:preview-student-1`) ?? '{}') as {
-      assessments?: { status: string; attemptNumber: number }[]
-      lessonProgress?: { lessonId: string }[]
-    }
-    expect(stored.assessments?.[0]).toMatchObject({ status: 'submitted', attemptNumber: 1 })
-    expect(stored.lessonProgress?.some((r) => r.lessonId === 'a0-01-l11')).toBe(false)
-  }, 60_000)
+    expect(store.assessments).toHaveLength(1)
+    expect(store.assessments[0]).toMatchObject({ status: 'submitted', attemptNumber: 1, score: 50, passed: false })
+    expect(store.lessonProgress.some((r) => r.lessonId === 't-01-l02')).toBe(false)
+
+    // A retake opens attempt 2 on a fresh runner.
+    await user.click(screen.getByTestId('retake'))
+    expect(await screen.findByTestId('assessment-attempt')).toHaveTextContent('Attempt 2 of 3')
+  })
 
   it('refuses the chapter check while practice lessons are open', async () => {
-    await renderAt('/learn/a0-01/lessons/a0-01-l11')
+    const { services } = await tinyServices(false)
+    await renderAt('/learn/t-01/lessons/t-01-l02', services)
     expect(await screen.findByText('This lesson is locked')).toBeInTheDocument()
   })
 })

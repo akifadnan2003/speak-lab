@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AzHelpProvider } from '@/features/curriculum/az-help'
@@ -173,8 +173,9 @@ describe('ExerciseRunner — practice mode', () => {
     await user.click(screen.getByRole('radio', { name: /am/ }))
     await user.click(screen.getByTestId('check-answer'))
     await user.click(screen.getByTestId('next-exercise'))
+    await waitFor(() => expect(screen.getByTestId('finish-lesson')).toBeEnabled())
     await user.click(screen.getByTestId('finish-lesson'))
-    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ score: 100, correct: 2, total: 2 }))
+    await waitFor(() => expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ score: 100, correct: 2, total: 2 })))
     expect(screen.getByText('Lesson complete')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Practise again' }))
     expect(screen.getByText('Exercise 1 of 2')).toBeInTheDocument()
