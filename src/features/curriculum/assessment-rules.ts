@@ -1,0 +1,86 @@
+import type { AssessmentAttemptSummary, LessonProgressRecord } from './ports'
+import type { Chapter } from './schema'
+
+/**
+ * Assessment integrity rules shared by the browser and the `assessment` Edge Function (the
+ * function imports a generated copy of this module, see `scripts/sync-function-shared.mjs`).
+ * Pure: no I/O, no dates read from the clock except where a `now` is passed in.
+ */
+
+/** Submitted attempts allowed per assessment and chapter version before a tutor reset is needed. */
+export const MAX_ASSESSMENT_ATTEMPTS = 3
+
+/** An open attempt that is not submitted within this window is voided on the next start. */
+export const ASSESSMENT_ATTEMPT_TTL_MS = 2 * 60 * 60 * 1000
+
+/** Correct answers are disclosed only after a pass or when no attempts remain. */
+export function revealAnswersAfter(passed: boolean, attemptsUsed: number, attemptsAllowed = MAX_ASSESSMENT_ATTEMPTS): boolean {
+  return passed || attemptsUsed >= attemptsAllowed
+}
+
+export function attemptsRemaining(attemptsUsed: number, attemptsAllowed = MAX_ASSESSMENT_ATTEMPTS): number {
+  return Math.max(0, attemptsAllowed - attemptsUsed)
+}
+
+/** Lookup table of assessment lessons so client-written rows for them can be ignored. */
+export function assessmentLessonIndex(chapters: readonly Chapter[]): ReadonlySet<string> {
+  const keys = new Set<string>()
+  for (const chapter of chapters) {
+    for (const lesson of chapter.lessons) {
+      if (lesson.kind === 'assessment') keys.add(`${chapter.id}/${lesson.id}`)
+    }
+  }
+  return keys
+}
+
+/**
+ * Builds the progress view the progression rules consume:
+ *   - practice rows pass through, except rows that claim an assessment lesson (dropped: only the
+ *     server-graded attempts count for those);
+ *   - every assessment lesson with at least one submitted attempt gets one record whose best
+ *     score and completion come from the attempts.
+ */
+export function mergeAssessmentResults(
+  rows: readonly LessonProgressRecord[],
+  attempts: readonly AssessmentAttemptSummary[],
+  assessmentLessons: ReadonlySet<string>,
+): LessonProgressRecord[] {
+  const merged = rows.filter((r) => !assessmentLessons.has(`${r.chapterId}/${r.lessonId}`))
+  const byLesson = new Map<string, AssessmentAttemptSummary[]>()
+  for (const attempt of attempts) {
+    if (attempt.status !== 'submitted' || typeof attempt.score !== 'number') continue
+    const key = `${attempt.chapterId}/${attempt.lessonId}`
+    byLesson.set(key, [...(byLesson.get(key) ?? []), attempt])
+  }
+  for (const group of byLesson.values()) {
+    const sorted = [...group].sort((a, b) => (a.submittedAt ?? '').localeCompare(b.submittedAt ?? ''))
+    const first = sorted[0]!
+    const last = sorted[sorted.length - 1]!
+    const best = Math.max(...sorted.map((a) => a.score ?? 0))
+    const firstPass = sorted.find((a) => a.passed)
+    merged.push({
+      studentId: first.studentId,
+      chapterId: first.chapterId,
+      lessonId: first.lessonId,
+      status: firstPass ? 'completed' : 'in_progress',
+      bestScore: best,
+      lastScore: last.score,
+      completedAt: firstPass?.submittedAt,
+      updatedAt: last.submittedAt ?? last.startedAt,
+    })
+  }
+  return merged
+}
+
+/** The attempt the learner can continue, if any: open and not yet expired. */
+export function openAttempt(
+  attempts: readonly AssessmentAttemptSummary[],
+  now: number = Date.now(),
+): AssessmentAttemptSummary | undefined {
+  return attempts.find((a) => a.status === 'in_progress' && new Date(a.expiresAt).getTime() > now)
+}
+
+/** Count of attempts that consumed one of the allowed tries. */
+export function countUsedAttempts(attempts: readonly AssessmentAttemptSummary[], chapterVersion: number): number {
+  return attempts.filter((a) => a.status === 'submitted' && a.chapterVersion === chapterVersion).length
+}

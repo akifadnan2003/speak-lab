@@ -6,6 +6,7 @@ import { UpdatePrompt } from '@/components/feedback/UpdatePrompt'
 import { ThemeProvider } from '@/components/theme/ThemeProvider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/features/auth/AuthProvider'
+import '@/features/curriculum/local-cleanup'
 import { router } from './router'
 
 function createQueryClient() {

@@ -60,11 +60,82 @@ export interface ChapterAccessOverride {
 }
 
 export interface ProgressRepository {
+  /**
+   * Practice progress plus one synthesised record per assessment lesson with a submitted
+   * attempt (see `assessment-rules.ts`). Rows a client wrote for an assessment lesson are ignored.
+   */
   listLessonProgress(studentId: string): Promise<readonly LessonProgressRecord[]>
+  /** Practice lessons only; assessment results come from `AssessmentGateway.submit`. */
   upsertLessonProgress(record: LessonProgressRecord): Promise<void>
   recordAttempt(attempt: ExerciseAttemptRecord): Promise<void>
   listAttempts(studentId: string, filter?: { lessonId?: string }): Promise<readonly ExerciseAttemptRecord[]>
   listChapterOverrides(studentId: string): Promise<readonly ChapterAccessOverride[]>
+  /** Tutor only (enforced server-side): unlock or skip a chapter for a linked student. */
+  setChapterOverride(override: ChapterAccessOverride & { readonly createdBy: string }): Promise<void>
+  clearChapterOverride(studentId: string, chapterId: string): Promise<void>
+}
+
+/* ---------------------------------------------------------------------------
+ * Assessments ("chapter checks") are graded by the server. The client never
+ * computes or submits a score: it starts an attempt, collects raw answers and
+ * submits them; the gateway returns the graded result and what may be shown.
+ * ------------------------------------------------------------------------- */
+
+export type AssessmentAttemptStatus = 'in_progress' | 'submitted' | 'voided'
+
+export interface AssessmentAttemptSummary {
+  readonly id: string
+  readonly studentId: string
+  readonly chapterId: string
+  readonly chapterVersion: number
+  readonly lessonId: string
+  readonly attemptNumber: number
+  readonly status: AssessmentAttemptStatus
+  readonly passMark: number
+  readonly score?: number
+  readonly passed?: boolean
+  readonly startedAt: string
+  readonly expiresAt: string
+  readonly submittedAt?: string
+}
+
+export interface AssessmentExerciseResult {
+  readonly exerciseId: string
+  readonly correct: boolean
+  /** 0..1 */
+  readonly score: number
+  /** Present only when the server allows disclosure (see `revealAnswers`). */
+  readonly correctAnswer?: string
+  readonly parts?: readonly { readonly key: string; readonly correct: boolean; readonly expected?: string }[]
+}
+
+export interface AssessmentAnswer {
+  readonly exerciseId: string
+  readonly answer: Answer
+}
+
+export interface AssessmentStart {
+  readonly attempt: AssessmentAttemptSummary
+  /** Submitted attempts so far (the open one is not counted). */
+  readonly attemptsUsed: number
+  readonly attemptsAllowed: number
+}
+
+export interface AssessmentResult {
+  readonly attempt: AssessmentAttemptSummary
+  readonly results: readonly AssessmentExerciseResult[]
+  /** Correct answers are disclosed only after a pass or once the last attempt is used. */
+  readonly revealAnswers: boolean
+  readonly attemptsUsed: number
+  readonly attemptsAllowed: number
+}
+
+export interface AssessmentGateway {
+  start(input: { studentId: string; chapterId: string; lessonId: string }): Promise<AssessmentStart>
+  submit(input: { studentId: string; attemptId: string; answers: readonly AssessmentAnswer[] }): Promise<AssessmentResult>
+  listAttempts(studentId: string, filter?: { chapterId?: string; lessonId?: string }): Promise<readonly AssessmentAttemptSummary[]>
+  /** Tutor only: void every attempt so the student can retake from attempt 1. */
+  reset(input: { studentId: string; chapterId: string; lessonId: string }): Promise<void>
 }
 
 export interface ContentSource {

@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useReducer, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, Lightbulb, RotateCcw, XCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, Lightbulb, Loader2, Lock, RotateCcw, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { LocalizedTextView } from '@/features/curriculum/az-help'
+import type { AssessmentAnswer, AssessmentResult } from '@/features/curriculum/ports'
 import { scoreLesson } from '@/features/curriculum/progression'
 import { EXERCISE_TYPE_LABEL, type Answer, type Exercise, type Lesson } from '@/features/curriculum/schema'
 import { cn } from '@/lib/utils'
@@ -13,6 +14,7 @@ import {
   answeredCount,
   attemptsLeft,
   canRetry,
+  collectAnswers,
   createSession,
   finalScores,
   sessionReducer,
@@ -39,6 +41,19 @@ export interface RunSummary {
   readonly scores: readonly number[]
 }
 
+/**
+ * Server-graded assessment wiring. When present, the runner never grades locally: answers are
+ * locked as the learner moves on and submitted together at the end; the results (and whether
+ * correct answers may be shown) come back from the gateway.
+ */
+export interface AssessmentRunnerOptions {
+  readonly attemptsUsed: number
+  readonly attemptsAllowed: number
+  readonly submit: (answers: readonly AssessmentAnswer[]) => Promise<AssessmentResult>
+  /** Starts a fresh attempt (the parent re-mounts the runner). Omit when no attempts remain. */
+  readonly onRetake?: () => void
+}
+
 export interface ExerciseRunnerProps {
   readonly lesson: Lesson
   readonly mode?: SessionMode
@@ -49,6 +64,7 @@ export interface ExerciseRunnerProps {
   readonly onComplete?: (summary: RunSummary) => void
   /** Rendered on the summary screen (e.g. "Next lesson"). */
   readonly summaryActions?: React.ReactNode
+  readonly assessment?: AssessmentRunnerOptions
 }
 
 /**
@@ -56,7 +72,7 @@ export interface ExerciseRunnerProps {
  * pure (`../engine`); this component only wires them to the UI and emits
  * attempt/complete events for persistence.
  */
-export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onComplete, summaryActions }: ExerciseRunnerProps) {
+export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onComplete, summaryActions, assessment }: ExerciseRunnerProps) {
   const sessionMode: SessionMode = mode ?? (lesson.kind === 'assessment' ? 'assessment' : 'practice')
   const [session, dispatch] = useReducer(
     sessionReducer,
@@ -65,6 +81,9 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
   )
   // Hint visibility is keyed by exercise id so moving on resets it without an effect.
   const [hintFor, setHintFor] = useState<string | null>(null)
+  const [submission, setSubmission] = useState<{ status: 'idle' | 'submitting' | 'error'; message?: string; result?: AssessmentResult }>({
+    status: 'idle',
+  })
   const started = useRef(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
 
@@ -72,6 +91,7 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
   const state = exercise ? session.states[exercise.id] : undefined
   const total = session.exercises.length
   const isAssessment = session.mode === 'assessment'
+  const serverGraded = isAssessment && !!assessment
   const hintOpen = !!exercise && hintFor === exercise.id
 
   /** Navigate and move focus to the exercise heading so screen readers announce the change. */
@@ -82,11 +102,34 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
 
   const finish = useCallback(() => {
     if (!allAnswered(session)) return
+    if (serverGraded) {
+      setSubmission({ status: 'submitting' })
+      assessment.submit(collectAnswers(session)).then(
+        (result) => {
+          const results: Record<string, GradeResult> = {}
+          for (const r of result.results) {
+            results[r.exerciseId] = { correct: r.correct, score: r.score, correctAnswer: r.correctAnswer ?? '', parts: r.parts }
+          }
+          dispatch({ type: 'results', results })
+          setSubmission({ status: 'idle', result })
+          onComplete?.({
+            score: result.attempt.score ?? 0,
+            correct: result.results.filter((r) => r.correct).length,
+            total,
+            scores: result.results.map((r) => r.score),
+          })
+        },
+        (error: unknown) => {
+          setSubmission({ status: 'error', message: error instanceof Error ? error.message : 'Could not submit your answers.' })
+        },
+      )
+      return
+    }
     const scores = finalScores(session)
     const correct = session.exercises.filter((e) => session.states[e.id]?.outcome === 'correct').length
     dispatch({ type: 'finish' })
     onComplete?.({ score: scoreLesson(scores), correct, total, scores })
-  }, [session, onComplete, total])
+  }, [session, serverGraded, assessment, onComplete, total])
 
   const check = useCallback(() => {
     if (!exercise || !state) return
@@ -98,32 +141,39 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
     // Pressing Done on a speaking prompt is the learner's confirmation that they said it.
     const answer: Answer = state.answer.type === 'speaking_prompt' ? { ...state.answer, done: true } : state.answer
     if (answer !== state.answer) dispatch({ type: 'answer', exerciseId: exercise.id, answer })
+    if (serverGraded) {
+      dispatch({ type: 'lock', exerciseId: exercise.id })
+      return
+    }
     const result = grade(exercise, answer)
     dispatch({ type: 'checked', exerciseId: exercise.id, result })
     onAttempt?.({ exercise, answer, result, attemptNumber: state.attempts + 1, hintUsed: state.hintUsed })
-  }, [exercise, state, onAttempt, onStart])
+  }, [exercise, state, onAttempt, onStart, serverGraded])
 
   const summary = useMemo(() => {
     if (!session.finished) return null
     const scores = finalScores(session)
     return {
-      score: scoreLesson(scores),
+      score: submission.result?.attempt.score ?? scoreLesson(scores),
       correct: session.exercises.filter((e) => session.states[e.id]?.outcome === 'correct').length,
     }
-  }, [session])
+  }, [session, submission.result])
 
   if (total === 0) {
     return <p className="text-sm text-fg-muted">This lesson has no exercises.</p>
   }
 
   if (session.finished && summary) {
+    const attemptsLeftAfter = assessment ? Math.max(0, assessment.attemptsAllowed - (submission.result?.attemptsUsed ?? assessment.attemptsUsed)) : undefined
     return (
       <SummaryView
         session={session}
         score={summary.score}
         correct={summary.correct}
         passMark={passMark}
-        onRestart={() => dispatch({ type: 'restart' })}
+        revealAnswers={submission.result?.revealAnswers ?? true}
+        remainingAttempts={attemptsLeftAfter}
+        onRestart={assessment ? assessment.onRetake : () => dispatch({ type: 'restart' })}
         actions={summaryActions}
       />
     )
@@ -138,6 +188,7 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
   const everythingAnswered = allAnswered(session)
   const isLast = session.index === total - 1
   const isSpeaking = exercise.type === 'speaking_prompt'
+  const submitting = submission.status === 'submitting'
 
   return (
     <div className="flex flex-col gap-4" data-testid="exercise-runner">
@@ -147,7 +198,13 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
         </h3>
         <div className="flex items-center gap-2">
           <Badge variant="neutral">{EXERCISE_TYPE_LABEL[exercise.type]}</Badge>
-          {isAssessment ? <Badge variant="warning">1 attempt</Badge> : null}
+          {assessment ? (
+            <Badge variant="warning" data-testid="assessment-attempt">
+              Attempt {assessment.attemptsUsed + 1} of {assessment.attemptsAllowed}
+            </Badge>
+          ) : isAssessment ? (
+            <Badge variant="warning">1 attempt</Badge>
+          ) : null}
         </div>
       </div>
       <Progress value={(done / total) * 100} size="sm" aria-label={`${done} of ${total} exercises answered`} />
@@ -199,16 +256,23 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
             attemptsLeft={attemptsLeft(session, exercise.id)}
           />
         ) : state.attempts > 0 ? (
-          <p role="status" className="rounded-lg bg-surface-2 p-3 text-sm text-fg-muted">
+          <p role="status" className="flex items-center gap-2 rounded-lg bg-surface-2 p-3 text-sm text-fg-muted">
+            <Lock className="size-3.5 shrink-0" aria-hidden />
             Answer saved. Results and explanations appear at the end.
           </p>
         ) : null}
       </div>
 
+      {submission.status === 'error' ? (
+        <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger-soft-fg" data-testid="assessment-error">
+          {submission.message} Your answers are kept; press Finish to try again.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
         {!frozen && state.outcome !== 'incorrect' ? (
           <Button onClick={check} disabled={!complete} data-testid="check-answer">
-            {isSpeaking ? 'Done' : 'Check'}
+            {isSpeaking ? 'Done' : isAssessment ? 'Save answer' : 'Check'}
           </Button>
         ) : null}
         {state.outcome === 'incorrect' && !isAssessment ? (
@@ -236,8 +300,9 @@ export function ExerciseRunner({ lesson, mode, passMark, onAttempt, onStart, onC
             Next <ArrowRight aria-hidden />
           </Button>
         ) : (
-          <Button onClick={finish} disabled={!everythingAnswered} data-testid="finish-lesson">
-            Finish <CheckCircle2 aria-hidden />
+          <Button onClick={finish} disabled={!everythingAnswered || submitting} data-testid="finish-lesson">
+            {submitting ? <Loader2 className="animate-spin" aria-hidden /> : <CheckCircle2 aria-hidden />}
+            {submitting ? 'Submitting' : serverGraded ? 'Submit' : 'Finish'}
           </Button>
         )}
       </div>
@@ -253,6 +318,8 @@ function SummaryView({
   score,
   correct,
   passMark,
+  revealAnswers,
+  remainingAttempts,
   onRestart,
   actions,
 }: {
@@ -260,13 +327,17 @@ function SummaryView({
   score: number
   correct: number
   passMark?: number
-  onRestart: () => void
+  revealAnswers: boolean
+  /** Server-graded assessments only: attempts remaining after this one. */
+  remainingAttempts?: number
+  onRestart?: () => void
   actions?: React.ReactNode
 }) {
   const total = session.exercises.length
   const isAssessment = session.mode === 'assessment'
   const passed = passMark === undefined || score >= passMark
   const scored = session.exercises.some((e) => e.type !== 'speaking_prompt')
+  const canRetake = !isAssessment || remainingAttempts === undefined || remainingAttempts > 0
 
   return (
     <div className="flex flex-col gap-5" data-testid="exercise-summary" aria-live="polite">
@@ -279,11 +350,11 @@ function SummaryView({
         >
           {passed ? <CheckCircle2 className="size-8" aria-hidden /> : <XCircle className="size-8" aria-hidden />}
         </span>
-        <h3 className="text-xl font-semibold">
+        <h3 className="text-xl font-semibold" data-testid="summary-outcome">
           {isAssessment ? (passed ? 'Passed' : 'Not passed yet') : 'Lesson complete'}
         </h3>
         {scored ? (
-          <p className="text-sm text-fg-muted tabular">
+          <p className="text-sm text-fg-muted tabular" data-testid="summary-score">
             Score {score}% · {correct} of {total} correct
             {passMark !== undefined ? ` · pass mark ${passMark}%` : ''}
           </p>
@@ -292,6 +363,18 @@ function SummaryView({
             {correct} of {total} prompts completed
           </p>
         )}
+        {isAssessment && remainingAttempts !== undefined ? (
+          <p className="text-xs text-fg-muted tabular" data-testid="summary-attempts">
+            {remainingAttempts === 0
+              ? 'No attempts left. Ask your tutor if you need another.'
+              : `${remainingAttempts} ${remainingAttempts === 1 ? 'attempt' : 'attempts'} left`}
+          </p>
+        ) : null}
+        {isAssessment && !revealAnswers ? (
+          <p className="max-w-md text-xs text-fg-muted" data-testid="answers-hidden">
+            Correct answers are shown after you pass or use your last attempt. Review the lessons and try again.
+          </p>
+        ) : null}
       </div>
 
       <ol className="flex flex-col divide-y divide-line rounded-lg border border-line">
@@ -312,11 +395,13 @@ function SummaryView({
                   {label}
                 </span>
               </div>
-              {!ok && s?.result ? (
+              {!ok && s?.result && revealAnswers ? (
                 <div className="ml-6 flex flex-col gap-1 text-xs text-fg-muted">
-                  <span>
-                    Correct: <span className="font-medium text-fg">{s.result.correctAnswer}</span>
-                  </span>
+                  {s.result.correctAnswer ? (
+                    <span>
+                      Correct: <span className="font-medium text-fg">{s.result.correctAnswer}</span>
+                    </span>
+                  ) : null}
                   {exercise.explanation ? <LocalizedTextView text={exercise.explanation} /> : null}
                 </div>
               ) : null}
@@ -326,9 +411,11 @@ function SummaryView({
       </ol>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="outline" onClick={onRestart}>
-          <RotateCcw aria-hidden /> {isAssessment ? 'Retake' : 'Practise again'}
-        </Button>
+        {onRestart && canRetake ? (
+          <Button variant="outline" onClick={onRestart} data-testid="retake">
+            <RotateCcw aria-hidden /> {isAssessment ? 'Retake' : 'Practise again'}
+          </Button>
+        ) : null}
         {actions}
       </div>
     </div>

@@ -62,6 +62,71 @@ export interface AccountEventRow {
     | 'account_disabled'
     | 'account_reactivated'
     | 'onboarding_completed'
+    | 'chapter_override_set'
+    | 'chapter_override_cleared'
+    | 'assessment_submitted'
+    | 'assessment_reset'
   metadata: Record<string, unknown>
   created_at: string
+}
+
+/* ---- M3 learning records (supabase/migrations/20261111150000_curriculum_progress.sql) ---- */
+
+export type LessonProgressStatus = 'in_progress' | 'completed' | 'skipped'
+export type ChapterOverrideKind = 'unlock' | 'skip'
+export type AssessmentAttemptStatus = 'in_progress' | 'submitted' | 'voided'
+
+export interface LessonProgressRow {
+  student_id: string
+  chapter_id: string
+  lesson_id: string
+  status: LessonProgressStatus
+  best_score: number | null
+  last_score: number | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ExerciseAttemptRow {
+  id: string
+  student_id: string
+  chapter_id: string
+  chapter_version: number
+  lesson_id: string
+  exercise_id: string
+  exercise_type: string
+  attempt_number: number
+  answer: Record<string, unknown>
+  correct: boolean
+  score: number
+  hint_used: boolean
+  created_at: string
+}
+
+export interface ChapterAccessOverrideRow {
+  student_id: string
+  chapter_id: string
+  kind: ChapterOverrideKind
+  created_by: string
+  created_at: string
+}
+
+export interface AssessmentAttemptRow {
+  id: string
+  student_id: string
+  chapter_id: string
+  chapter_version: number
+  lesson_id: string
+  attempt_number: number
+  status: AssessmentAttemptStatus
+  pass_mark: number
+  answers: unknown[]
+  results: unknown[]
+  score: number | null
+  passed: boolean | null
+  started_at: string
+  expires_at: string
+  submitted_at: string | null
+  voided_at: string | null
 }

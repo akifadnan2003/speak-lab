@@ -1,17 +1,18 @@
-import type { ProgressRepository } from '../ports'
-import { createMemoryProgressRepository, createMemoryStore, type MemoryStore } from './memory'
+import type { AssessmentGateway, ProgressRepository } from '../ports'
+import type { Chapter } from '../schema'
+import { createMemoryAssessmentGateway, createMemoryProgressRepository, createMemoryStore, type MemoryStore } from './memory'
 
 /**
- * localStorage-backed ProgressRepository.
+ * localStorage-backed ProgressRepository and AssessmentGateway.
  *
- * This is the M3 stand-in for the Supabase repository: progress survives
- * reloads on one device so the Learn flow is genuinely usable today. The UI
- * labels it as device-only. Storage is namespaced per student id so switching
- * preview roles or accounts never mixes records. Attempts are capped to keep
- * the payload small; the server-side table has no such cap.
+ * Used only by builds without a backend (`VITE_UI_PREVIEW`): progress survives reloads on one
+ * device so the Learn flow can be reviewed, and the UI labels it as device-only. Real builds use
+ * the Supabase implementations (`./supabase.ts`). Storage is namespaced per student id so
+ * switching preview roles never mixes records, and every key starts with `speaklab.` so the
+ * M2 sign-out purge removes it (`clearStoredProgress` is also registered as a cleaner).
  *
- * Every operation reads the stored JSON fresh and writes it back, so two
- * tabs (or tests) sharing one Storage never see stale cached state.
+ * Every operation reads the stored JSON fresh and writes it back, so two tabs (or tests) sharing
+ * one Storage never see stale cached state.
  */
 export const PROGRESS_STORAGE_PREFIX = 'speaklab.progress.v1'
 const MAX_STORED_ATTEMPTS = 2000
@@ -29,6 +30,7 @@ function readStore(storage: Storage, studentId: string): MemoryStore {
       lessonProgress: Array.isArray(parsed.lessonProgress) ? parsed.lessonProgress : [],
       attempts: Array.isArray(parsed.attempts) ? parsed.attempts : [],
       overrides: Array.isArray(parsed.overrides) ? parsed.overrides : [],
+      assessments: Array.isArray(parsed.assessments) ? parsed.assessments : [],
     }
   } catch {
     return createMemoryStore()
@@ -45,9 +47,8 @@ function writeStore(storage: Storage, studentId: string, store: MemoryStore) {
 }
 
 /**
- * Remove every device-local progress record. M2's sign-out (and the preview
- * role switch) should call this so a shared device never shows another
- * learner's answers.
+ * Remove every device-local progress record. Registered with `registerLocalDataCleaner` so
+ * sign-out and account switching call it (see `src/features/curriculum/local-cleanup.ts`).
  */
 export function clearStoredProgress(storage: Storage | undefined = typeof window !== 'undefined' ? window.localStorage : undefined) {
   if (!storage) return
@@ -63,17 +64,39 @@ export function clearStoredProgress(storage: Storage | undefined = typeof window
   }
 }
 
+function defaultStorage(): Storage | undefined {
+  return typeof window !== 'undefined' ? window.localStorage : undefined
+}
+
 export function createLocalStorageProgressRepository(
-  storage: Storage | undefined = typeof window !== 'undefined' ? window.localStorage : undefined,
+  storage: Storage | undefined = defaultStorage(),
+  chapters?: readonly Chapter[],
 ): ProgressRepository {
-  if (!storage) return createMemoryProgressRepository()
+  if (!storage) return createMemoryProgressRepository(undefined, undefined, chapters)
   const forStudent = (studentId: string) =>
-    createMemoryProgressRepository(readStore(storage, studentId), (s) => writeStore(storage, studentId, s))
+    createMemoryProgressRepository(readStore(storage, studentId), (s) => writeStore(storage, studentId, s), chapters)
   return {
     listLessonProgress: (studentId) => forStudent(studentId).listLessonProgress(studentId),
     upsertLessonProgress: (record) => forStudent(record.studentId).upsertLessonProgress(record),
     recordAttempt: (attempt) => forStudent(attempt.studentId).recordAttempt(attempt),
     listAttempts: (studentId, filter) => forStudent(studentId).listAttempts(studentId, filter),
     listChapterOverrides: (studentId) => forStudent(studentId).listChapterOverrides(studentId),
+    setChapterOverride: (override) => forStudent(override.studentId).setChapterOverride(override),
+    clearChapterOverride: (studentId, chapterId) => forStudent(studentId).clearChapterOverride(studentId, chapterId),
+  }
+}
+
+export function createLocalStorageAssessmentGateway(
+  storage: Storage | undefined = defaultStorage(),
+  chapters?: readonly Chapter[],
+): AssessmentGateway {
+  if (!storage) return createMemoryAssessmentGateway(undefined, undefined, chapters)
+  const forStudent = (studentId: string) =>
+    createMemoryAssessmentGateway(readStore(storage, studentId), (s) => writeStore(storage, studentId, s), chapters)
+  return {
+    start: (input) => forStudent(input.studentId).start(input),
+    submit: (input) => forStudent(input.studentId).submit(input),
+    listAttempts: (studentId, filter) => forStudent(studentId).listAttempts(studentId, filter),
+    reset: (input) => forStudent(input.studentId).reset(input),
   }
 }

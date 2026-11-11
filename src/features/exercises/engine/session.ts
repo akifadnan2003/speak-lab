@@ -40,6 +40,10 @@ export type SessionAction =
   | { type: 'answer'; exerciseId: string; answer: Answer }
   | { type: 'hint'; exerciseId: string }
   | { type: 'checked'; exerciseId: string; result: GradeResult }
+  /** Assessment graded elsewhere: the answer is locked now, the result arrives with `results`. */
+  | { type: 'lock'; exerciseId: string }
+  /** Server-graded results for an assessment; finishes the session. */
+  | { type: 'results'; results: Readonly<Record<string, GradeResult>> }
   | { type: 'retry'; exerciseId: string }
   | { type: 'reveal'; exerciseId: string }
   | { type: 'go'; index: number }
@@ -101,6 +105,28 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
         return withState(state, action.exerciseId, { attempts, result, outcome, finalScore })
       }
       return withState(state, action.exerciseId, { attempts, result, outcome: 'incorrect', finalScore: result.score })
+    }
+    case 'lock': {
+      const current = state.states[action.exerciseId]
+      if (!current || state.mode !== 'assessment' || current.attempts > 0) return state
+      return withState(state, action.exerciseId, { attempts: 1 })
+    }
+    case 'results': {
+      if (state.mode !== 'assessment') return state
+      const states: Record<string, ExerciseState> = { ...state.states }
+      for (const exercise of state.exercises) {
+        const current = states[exercise.id]
+        const result = action.results[exercise.id]
+        if (!current || !result) continue
+        states[exercise.id] = {
+          ...current,
+          attempts: Math.max(1, current.attempts),
+          result,
+          outcome: result.correct ? 'correct' : 'incorrect',
+          finalScore: result.score,
+        }
+      }
+      return { ...state, states, finished: true }
     }
     case 'retry': {
       const current = state.states[action.exerciseId]
@@ -166,8 +192,13 @@ export function allAnswered(state: SessionState): boolean {
 export function answeredCount(state: SessionState): number {
   return state.exercises.filter((e) => {
     const s = state.states[e.id]
-    return !!s && s.outcome !== 'pending'
+    return !!s && (s.outcome !== 'pending' || s.attempts > 0)
   }).length
+}
+
+/** Every exercise's current answer, for a server-graded submission. */
+export function collectAnswers(state: SessionState): { exerciseId: string; answer: Answer }[] {
+  return state.exercises.map((e) => ({ exerciseId: e.id, answer: state.states[e.id]?.answer ?? emptyAnswer(e) }))
 }
 
 export function finalScores(state: SessionState): number[] {
