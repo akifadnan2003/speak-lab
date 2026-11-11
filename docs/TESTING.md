@@ -1,6 +1,6 @@
 # SpeakLab — Testing Strategy
 
-Last updated for milestone M2 (2026-11-03).
+Last updated for milestone M2 (2026-11-11).
 
 ## 1. Layers
 
@@ -66,7 +66,8 @@ account switch), `lib/local-data` (prefix purge, keep-list, cleaners, shared-dev
 Shell e2e (32 tests, two projects): unchanged from M1 (manifest, deep links, navigation,
 exercise keyboard use, role isolation, dialogs, theme, overflow at 7 widths).
 
-Database + real-auth (CI `database` job): 16 integration tests and 5 browser scenarios listed above.
+Database + real-auth (CI `database` job): 21 integration tests and 5 browser scenarios (10 test
+runs across two projects) listed above.
 
 ## 5. Conventions
 

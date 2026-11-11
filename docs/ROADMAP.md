@@ -1,12 +1,12 @@
 # SpeakLab — Roadmap and Milestones
 
-Last updated 2026-11-03. Status legend: ✅ done · 🔄 in progress · ⏳ planned.
+Last updated 2026-11-11. Status legend: ✅ done · 🔄 in progress · ⏳ planned.
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
 | M0 | Repository, architecture, documentation, commands, test strategy | ✅ |
 | M1 | Application foundation and design system | ✅ |
-| M2 | Authentication, authorization and student invitations | ✅ (owner bootstrap pending) |
+| M2 | Authentication, authorization and student invitations | ✅ (live in production 2026-11-11) |
 | M3 | Curriculum and exercise engine | ⏳ next |
 | M4 | Vocabulary and revision | ⏳ |
 | M5 | Student progress | ⏳ |
@@ -55,12 +55,18 @@ Delivered:
       Supabase stack; manual `supabase-deploy.yml` for additive backend deployment
 - [x] Docs: `SUPABASE_SETUP.md`, security, architecture, testing, ADR-009…012
 
-Owner actions still required (see `docs/SUPABASE_SETUP.md`):
+Production state (2026-11-11): migration applied and `student-admin` deployed through the manual
+workflow (Session pooler, CLI 3.0.0), real-auth frontend live, owner bootstrapped, one test
+student created from the dashboard and linked with `tutor_students`. Verified on the hosted
+project: signup rejected, anonymous REST denied, function rejects unauthenticated calls, exactly
+one tutor, student session reads only its own rows.
 
-1. Replace the *Invite user* and *Reset password* email templates (§1.3).
-2. Run the **Supabase backend (manual)** workflow once (migrations + function) if it has not run.
-3. Create the owner Auth user and run `select public.bootstrap_owner('<uuid>')` (§3).
-4. Sign in on the live site, invite the two students, and complete the device checklist.
+Owner actions still open (see `docs/SUPABASE_SETUP.md`):
+
+1. Configure custom SMTP (§1.3) and replace the *Invite user* and *Reset password* templates
+   (§1.4). Until then invitations from the app and "Forgot password" cannot send email; create
+   students from the dashboard and link them with the `tutor_students` insert (§3).
+2. Complete the manual device checklist in `docs/TESTING.md` §6.
 
 ## M3 — Curriculum and Exercise Engine ⏳
 
