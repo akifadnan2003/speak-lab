@@ -63,6 +63,40 @@ nav, button/dialog/tabs, router (production fail-closed, preview mode, real-conf
 missing profile, SIGNED_OUT, verifyOtp success, expired link, local-data purge on sign-out and
 account switch), `lib/local-data` (prefix purge, keep-list, cleaners, shared-device switch).
 
+Unit / integration added by M3 (71 tests, total 113):
+
+- `curriculum/content`: 70-chapter map shape, level ordering, consecutive numbering, prerequisite
+  order and cycle rejection, A0-01 lesson kinds and exercise-type coverage, id uniqueness.
+- `exercises/engine/normalize`: case/space/punctuation forgiveness, curly quotes, question marks,
+  no forgiveness for apostrophes or word order; word counting; phrase containment.
+- `exercises/engine/grade`: every exercise type, partial credit per blank/pair, ordering
+  alternatives, question-mark requirement, speaking self-check, writing checklist, empty answers.
+- `exercises/engine/session`: practice attempts → reveal, retry keeps typed text, hint recorded,
+  navigation bounds, finish/restart, assessment single attempt and frozen answers.
+- `curriculum/progression`: new-student unlocking, assessment gating, pass-mark completion,
+  speaking-skip rule, tutor unlock/skip overrides, lesson scoring.
+- `curriculum/persistence`: memory and localStorage repositories, per-student namespacing,
+  idempotent attempts, corrupted storage.
+- `exercises/components/ExerciseRunner`: MCQ flow with explanation, three-attempt retry and reveal,
+  hint + Azerbaijani layer, word bank + Enter, ordering by tap and arrow keys, matching partial
+  credit, speaking Done + summary, finish gating, assessment mode with hidden feedback.
+- `lesson/LessonWorkspacePage`: preview-session Learn list (only A0-01 openable), chapter lessons
+  with locked assessment, locked lesson refusal, lesson run persisting attempts/progress to
+  localStorage, Azerbaijani switch, completed lesson reflected in the chapter view.
+
+End-to-end (34 tests across two projects):
+
+- Base path, manifest (`start_url`, `scope`, `display`), service worker reachable.
+- Deep hash route direct navigation and refresh (`/learn/a0-01`).
+- Preview banner visible.
+- Student navigation through bottom bar (mobile) / sidebar (desktop).
+- Real lesson exercise operable by keyboard; progress survives navigation; sentence ordering by tap.
+- Student cannot reach `/tutor`.
+- Tutor cards open profile; tab routing; grammar table.
+- Invite dialog validation and Escape.
+- Theme switch persists across reload.
+- No horizontal overflow at 320/375/390/430/768/1024/1440 on eight screens.
+
 Shell e2e (32 tests, two projects): unchanged from M1 (manifest, deep links, navigation,
 exercise keyboard use, role isolation, dialogs, theme, overflow at 7 widths).
 

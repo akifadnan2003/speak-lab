@@ -131,3 +131,31 @@ tutor access, while the shell e2e suite still benefits from the demo session.
 throws if both are set; the deploy workflow no longer sets the flag and requires the public
 Supabase variables. Preview remains available for builds with no backend (shell e2e, local review).
 **Consequences.** Demo fixtures stay isolated and labelled; real builds fail closed by construction.
+
+## ADR-013 · Curriculum engine behind content and progress ports (2026-11-03)
+
+**Context.** M3 (curriculum + exercise engine) was built in parallel with M2 (Supabase auth) and
+must not depend on tables or Edge Functions that do not exist yet, while still being genuinely
+usable and later pluggable into Postgres without rewriting screens.
+**Decision.** Content and progress are accessed only through two interfaces in
+`src/features/curriculum/ports.ts`: `ContentSource` (chapters) and `ProgressRepository` (lesson
+progress, attempts, tutor overrides). M3 ships a static content source (TypeScript modules
+validated by Zod at import) and a `localStorage` progress repository, injected via
+`CurriculumProvider`. Grading (`src/features/exercises/engine/grade.ts`) and progression rules
+(`src/features/curriculum/progression.ts`) are pure functions. Exercise types are a Zod
+discriminated union; graders and components switch exhaustively on it.
+**Consequences.** Learn / Chapter / Lesson screens work today without a backend and the UI states
+that progress is device-only. The Supabase implementation only has to satisfy the ports; the
+`exercise_attempts` record shape (client id as idempotency key) is already final. Speaking and
+writing are self-checked or checklist-graded; no AI is simulated. Adding an exercise type means a
+schema, a grader and a component, enforced by TypeScript.
+
+## ADR-014 · A0 chapter 1 teaches sentence structure and *to be* (2026-11-03)
+
+**Context.** The original map opened with an alphabet/greetings chapter; the M3 brief asked for a
+first chapter that starts with sentence structure, subject pronouns and *am / is / are*.
+**Decision.** A0-01 is "Sentence structure, subject pronouns and am / is / are". The alphabet
+becomes its pronunciation lesson (spelling your name) and greetings/jobs its vocabulary lesson; a
+new A0-04 (adjectives) keeps A0 at eight chapters. `pronunciation` was added as a lesson kind.
+**Consequences.** Learners produce full sentences from the first lesson. `docs/CURRICULUM.md`
+and the map are kept in sync by `curriculum.test.ts`.

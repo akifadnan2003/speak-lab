@@ -47,6 +47,11 @@ Never claim a check passed without running it. Never delete a meaningful test to
 
 - TypeScript strict, `noUncheckedIndexedAccess` on. No `any`.
 - Imports use the `@/` alias. Feature code lives in `src/features/<feature>/`.
+- Curriculum content is data: author chapters in `src/features/curriculum/content/chapters/` with
+  the helpers in `content/authoring.ts`, register them in `curriculum-map.ts`, never in components.
+  Exercise grading and progression rules are pure functions in `src/features/exercises/engine/` and
+  `src/features/curriculum/progression.ts`; screens talk to persistence only through
+  `src/features/curriculum/ports.ts`.
 - UI primitives in `src/components/ui/` follow the shadcn pattern (Radix + `cva` + `cn`).
 - Styling: Tailwind 4 utilities bound to semantic tokens (`bg-surface`, `text-fg-muted`,
   `border-line`, `bg-primary`, status `*-soft` colours). Do not hard-code hex colours in components.
