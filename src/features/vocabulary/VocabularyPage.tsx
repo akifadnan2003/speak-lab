@@ -29,6 +29,7 @@ import { useProgression } from '@/features/curriculum/CurriculumProvider'
 import { CEFR_LEVELS, type CefrLevel } from '@/features/curriculum/schema'
 import { cn } from '@/lib/utils'
 import { VOCABULARY_MODES } from './modes'
+import { LocalImportCard } from './components/LocalImportCard'
 import { stageLabel } from './stage-label'
 import type { VocabularyStage, VocabularyState } from './ports'
 import { QUEUE_REASON_LABEL } from './revision/queue'
@@ -106,6 +107,8 @@ function VocabularyDashboard() {
           </span>
         }
       />
+
+      {storage === 'cloud' && <LocalImportCard studentId={user!.id} />}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="vocab-stats">
         <Stat label="Due now" value={stats.dueNow} hint={stats.overdue > 0 ? `${stats.overdue} overdue` : 'Scheduled reviews'} icon={Layers} tone="primary" />
