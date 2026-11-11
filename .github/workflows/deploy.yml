@@ -47,8 +47,12 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       - name: Verify no secret key reached the bundle
+        # supabase-js itself contains the bare prefix "sb_secret_" in a key-format check, so match
+        # the shape of an actual key (prefix followed by a long token), and also the legacy
+        # service-role JWT claim.
         run: |
-          if grep -rq "sb_secret_" dist/assets; then echo "::error::secret key found in bundle"; exit 1; fi
+          if grep -rqE 'sb_secret_[A-Za-z0-9_-]{20,}' dist/assets; then echo "::error::secret key found in bundle"; exit 1; fi
+          if grep -rqE '"role":"service_role"|service_role' dist/assets; then echo "::error::service-role material found in bundle"; exit 1; fi
       - name: Add SPA fallbacks
         run: |
           cp dist/index.html dist/404.html
