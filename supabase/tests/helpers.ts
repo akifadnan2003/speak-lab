@@ -119,7 +119,14 @@ export async function waitForEmail(to: string, seen = new Set<string>(), timeout
 export function extractAuthLink(html: string, text: string): URL {
   const unescaped = html.replace(/&amp;/g, '&')
   const match = unescaped.match(/https?:\/\/[^\s"'<>]+token_hash=[^\s"'<>]+/) ?? text.match(/https?:\/\/[^\s"'<>]+token_hash=[^\s"'<>]+/)
-  if (!match) throw new Error('No token_hash link found in email')
+  if (!match) {
+    // Local Mailpit only: these links carry throwaway tokens for the disposable test stack.
+    const links = Array.from(unescaped.matchAll(/https?:\/\/[^\s"'<>]+/g), (m) => m[0])
+    throw new Error(
+      `No token_hash link found in email. The auth service probably used its built-in template ` +
+        `instead of supabase/templates (check the Supabase CLI version). Links found: ${links.join(' | ') || 'none'}`,
+    )
+  }
   return new URL(match[0])
 }
 

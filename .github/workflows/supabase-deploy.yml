@@ -54,9 +54,10 @@ jobs:
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
+      # Same pin as ci.yml: the version whose `--remote`, `--yes` and deploy behaviour was verified.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.0.0
       - name: Check the database connection secret (value is never printed)
         # Parsed with a real URL parser, not a pattern match, so the host that will actually be
         # dialled is the one being checked (a query string or userinfo cannot smuggle a host).

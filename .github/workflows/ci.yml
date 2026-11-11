@@ -68,9 +68,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Pinned to the version the database suite is proven on. 3.1.0 changed how the local stack
+      # serves `content_path` email templates to the auth container (supabase/cli#7527) and the
+      # invite email arrived with the built-in template (no token_hash) on GitHub-hosted runners.
+      # Bump deliberately, with a green `database` job, never via `latest`.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.0.0
       - name: Start local Supabase (applies supabase/migrations, serves Edge Functions, captures email)
         run: supabase start -x studio,imgproxy,logflare,vector
       - name: Export local credentials for the tests

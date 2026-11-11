@@ -31,6 +31,10 @@ npm run test:e2e:auth     # e2e/auth.spec.ts (playwright.auth.config.ts); reads 
 
 `test:db` and `test:e2e:auth` refuse to run against a non-local Supabase URL.
 
+The Supabase CLI is pinned to **3.0.0** in `package.json` and both workflows. Newer releases
+change how the local stack serves the custom email templates (3.1.0 broke the invite email in
+CI); bump it on purpose with a green `database` job, not through `latest`.
+
 ## 3. M2 requirement coverage
 
 | # | Requirement | Where it is proven |
