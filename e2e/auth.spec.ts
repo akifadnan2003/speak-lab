@@ -263,8 +263,14 @@ test('student learns on this device, progress follows the account to another dev
   await page.getByRole('tab', { name: 'Curriculum' }).click()
   await expect(page.getByTestId('current-chapter')).toContainText('A0')
   await page.getByTestId('place-at-level').selectOption('A2')
-  await expect(page.getByTestId('current-chapter')).toContainText('A2', { timeout: 30_000 })
-  await expect(page.locator('[data-testid="tutor-chapter-row"][data-chapter="a0-01"]')).toHaveAttribute('data-status', 'skipped')
+  await expect(page.locator('[data-testid="tutor-chapter-row"][data-chapter="a0-01"]')).toHaveAttribute('data-status', 'skipped', { timeout: 30_000 })
+  await expect(page.locator('[data-testid="tutor-chapter-row"][data-chapter="a1-10"]')).toHaveAttribute('data-status', 'skipped')
+  // The A2 showcase chapter still sits behind the planned A2-01..06, so the tutor unlocks it directly.
+  const showcase = page.locator('[data-testid="tutor-chapter-row"][data-chapter="a2-07"]')
+  await expect(showcase).toHaveAttribute('data-status', 'locked')
+  await showcase.getByTestId('unlock-chapter').click()
+  await expect(showcase).toHaveAttribute('data-status', 'available', { timeout: 30_000 })
+  await expect(showcase.getByTestId('override-badge')).toHaveText('Unlocked by tutor')
 
   await again.goto('./#/learn')
   await again.getByRole('button', { name: /^A2 / }).click()

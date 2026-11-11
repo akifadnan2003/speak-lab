@@ -68,7 +68,7 @@ export function StudentCurriculumSection({ studentId, tutorId }: { studentId: st
             <p className="mt-1 text-sm text-fg-muted">
               Currently on{' '}
               <span className="font-medium text-fg" data-testid="current-chapter">
-                {current ? `${current.chapter.level} · ${current.chapter.title}` : 'nothing (every chapter done or locked)'}
+                {current ? `${current.chapter.level} · ${current.chapter.title}` : 'no written chapter is open (the next ones are planned or locked)'}
               </span>
               . {completed} completed, {skipped} skipped.
             </p>
