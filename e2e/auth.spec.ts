@@ -272,9 +272,12 @@ test('student learns on this device, progress follows the account to another dev
   await expect(showcase).toHaveAttribute('data-status', 'available', { timeout: 30_000 })
   await expect(showcase.getByTestId('override-badge')).toHaveText('Unlocked by tutor')
 
+  // The learner's open page still holds the earlier progression; a reload picks up the tutor's change.
   await again.goto('./#/learn')
+  await again.reload()
+  await expect(again.getByRole('heading', { name: 'Your curriculum' })).toBeVisible({ timeout: 30_000 })
   await again.getByRole('button', { name: /^A2 / }).click()
-  await expect(again.getByTestId('chapter-card').nth(6)).toHaveAttribute('data-status', 'available')
+  await expect(again.getByTestId('chapter-card').nth(6)).toHaveAttribute('data-status', 'available', { timeout: 30_000 })
   await again.getByTestId('chapter-card').nth(6).getByRole('link').click()
   await expect(again.getByRole('heading', { name: /Past Continuous/ })).toBeVisible()
   await device2.close()
