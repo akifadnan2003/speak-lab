@@ -292,8 +292,10 @@ test('vocabulary answers follow the account, queue offline with a visible warnin
   await admin.from('tutor_students').insert({ tutor_id: tutor.id, student_id: studentId })
   await admin.from('profiles').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', studentId)
 
-  // Device 1, online: one flashcard answer reaches the account straight away.
-  const device1 = await browser.newContext()
+  // Device 1, online: one flashcard answer reaches the account straight away. Service workers are
+  // blocked in this context because Chromium's offline emulation does not apply to requests that
+  // pass through one, so the later "offline" step would still reach the server.
+  const device1 = await browser.newContext({ serviceWorkers: 'block' })
   const student = await device1.newPage()
   await login(student, email, STUDENT_PASSWORD)
   await expect(student).toHaveURL(/#\/$/)
