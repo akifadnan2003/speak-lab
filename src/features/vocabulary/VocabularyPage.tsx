@@ -218,12 +218,13 @@ function VocabularyDashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle>This device</CardTitle>
+              <CardTitle>{storage === 'cloud' ? 'Your progress' : 'This device'}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-fg-muted">
-                Vocabulary progress is stored on this device under your account id until cloud sync is connected. Resetting removes
-                every review and schedule for this account on this device only.
+                {storage === 'cloud'
+                  ? 'Vocabulary progress is saved to your account and follows you to every device. Resetting removes every schedule for this account; your answer history stays visible to your tutor.'
+                  : 'Vocabulary progress is stored on this device under your account id until cloud sync is connected. Resetting removes every review and schedule for this account on this device only.'}
               </p>
               <Dialog>
                 <DialogTrigger asChild>
@@ -235,8 +236,8 @@ function VocabularyDashboard() {
                   <DialogHeader>
                     <DialogTitle>Reset vocabulary progress?</DialogTitle>
                     <DialogDescription>
-                      This deletes {stats.learned} learned words' schedules and {records.reviews?.length ?? 0} review records on this device.
-                      It cannot be undone.
+                      This deletes {stats.learned} learned words' schedules and {records.reviews?.length ?? 0} review records{' '}
+                      {storage === 'cloud' ? 'from your account, on every device' : 'on this device'}. It cannot be undone.
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
