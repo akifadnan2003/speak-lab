@@ -1,8 +1,14 @@
 # SpeakLab — Curriculum Specification
 
-Last updated for milestone M1 (2026-11-03). The content model ships in M3; this document is the
-sequencing source of truth that M3 will encode as versioned content.
+Last updated for milestone M3 (2026-11-03). The sequencing below is encoded as validated content in
+`src/features/curriculum/content/curriculum-map.ts`; authored chapters live in
+`src/features/curriculum/content/chapters/`. This document stays the human-readable source of truth
+and must change together with the map (`curriculum.test.ts` checks counts and ordering).
 
+> **M3 integration (2026-11-11).** A0-01 and A2-07 are authored; every other chapter is
+> `planned`. Chapter checks are graded by the `assessment` Edge Function (ADR-015); placement is
+> expressed as tutor overrides (ADR-016).
+>
 > **M3 sequencing correction (2026-11-03).** Implementation starts with a proper **A0/A1
 > foundation chapter** before any A2 material. The A2 Past Continuous chapter is the exercise-engine
 > showcase, reached through placement-based acceleration, not the default starting point. Every
@@ -27,25 +33,44 @@ example sentences, vocabulary set(s), interactive exercises, speaking drills, li
 reading, writing task, end-of-chapter assessment, revision requirements, difficulty, completion
 conditions (e.g. assessment ≥ 80 % and speaking drill completed), version.
 
-Each **lesson** inside a chapter has a kind (`grammar | vocabulary | speaking | listening | reading |
-writing | assessment`), an estimated duration, content blocks and exercise references. Lesson
-status per student: `locked | available | in_progress | completed | skipped`.
+Each **lesson** inside a chapter has a kind (`grammar | vocabulary | pronunciation | speaking |
+listening | reading | writing | assessment`), an estimated duration, content blocks and inline
+exercises. Lesson status per student: `locked | available | in_progress | completed | skipped`.
 
-Content is stored as versioned JSON in Postgres (`lesson_content.version`), validated by Zod
-schemas shared between the content tooling and the renderer. Chapters are never hardcoded in React
-components.
+Schemas (`src/features/curriculum/schema/`): `ChapterSchema` → `LessonSchema` → `ContentBlockSchema`
+(heading, paragraph, examples, table, tip, vocabulary, dialogue, passage) and `ExerciseSchema`, a
+discriminated union of nine types: `multiple_choice`, `fill_blank`, `sentence_ordering`,
+`error_correction`, `matching`, `question_formation`, `sentence_transformation`, `speaking_prompt`
+(self-checked), `guided_writing` (deterministic checklist). Every explanation, hint and feedback
+is a `LocalizedText { en, az? }`: English always, Azerbaijani optional and shown only on request.
+
+Content is authored as TypeScript modules today and will be stored as versioned JSON in Postgres
+(`lesson_content.version`) later; the same Zod schemas validate both. Chapters are never hardcoded
+in React components: screens read the `ContentSource` port and the `ProgressRepository` port
+(`src/features/curriculum/ports.ts`).
+
+**Progression rules.** A chapter unlocks when its prerequisites are completed or skipped (or the
+tutor unlocked it). Inside an unlocked chapter every lesson is available except the chapter check,
+which unlocks when all other lessons are done. A chapter is complete when every lesson is completed
+or skipped, speaking lessons are actually completed, and the chapter check reaches the pass mark
+(80 % by default). Practice exercises allow three attempts, then reveal the answer; the chapter
+check allows one attempt per item and shows explanations only at the end.
 
 ## 3. Level map
 
+Chapter ids are `<level>-<nn>` (`a0-01` … `c1-12`). Status: ✅ authored · ⏳ planned.
+
 ### A0 — Foundations (8 chapters)
-1. Alphabet, sounds, greetings, classroom language
-2. Subject pronouns and *to be* (affirmative, negative, questions)
-3. Articles *a / an*, singular nouns, *this / that*
-4. Plurals, *these / those*, numbers, prices
+1. ✅ Sentence structure, subject pronouns and *am / is / are* — includes greetings, countries, jobs,
+   classroom language, the alphabet (spelling your name), two speaking lessons, reading, writing
+   and the chapter check (11 lessons, 130+ exercises)
+2. Articles *a / an*, singular nouns, *this / that*
+3. Plurals, *these / those*, numbers, prices
+4. Adjectives: describing people and things; colours, nationalities
 5. Possessive adjectives and *'s*; family
 6. *There is / there are*; prepositions of place; home
-7. Basic questions: *what, where, who, how old*; personal information
-8. Review and placement checkpoint; survival dialogues (café, shop, directions)
+7. Wh- questions: *what, where, who, how old*; personal information
+8. Review, survival dialogues (café, shop, directions) and A0 checkpoint
 
 ### A1 — Elementary (10 chapters)
 1. Present Simple: routines, frequency adverbs, *do / does* questions and negatives

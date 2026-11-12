@@ -39,6 +39,9 @@ caller's JWT and role before using the service-role key.
 | `src/lib/local-data.ts` | Registry and purge of student-local data (storage keys, IndexedDB, feature cleaners). Used by the auth provider on sign-out, SIGNED_OUT and account switch. |
 | `src/features/tutor/api.ts` | Queries for students / invitations / events and the `student-admin` function call (`callStudentAdmin`). Demo fixtures only in preview mode. |
 | `src/features/*` | One folder per product area; pages import demo data today and queries tomorrow. |
+| `src/features/curriculum/` | Zod `schema/` (chapter, lesson, blocks, exercises, answers), `content/` (A0–C1 map + authored chapters, validated at import), `ports.ts` (`ContentSource`, `ProgressRepository`), `persistence/` (memory, localStorage), `progression.ts` (pure unlock/completion rules), `CurriculumProvider.tsx` (DI + TanStack Query hooks), `az-help.tsx` (Azerbaijani layer). |
+| `src/features/exercises/` | `engine/` (pure: `grade.ts`, `normalize.ts`, `session.ts` reducer, `shuffle.ts`), `components/` (one component per exercise type, `ExerciseRenderer`, `ExerciseRunner`, `ExerciseFeedback`). |
+| `src/features/learn/`, `src/features/lesson/` | Learn (levels + chapters), Chapter (lessons, objectives, completion rules), Lesson workspace (content blocks + runner, persistence wiring). |
 | `src/components/ui/` | Accessible primitives (Radix + cva): button, card, badge, input, label, dialog, sheet, tabs, progress (+ ring), switch, avatar, skeleton, tooltip, dropdown-menu, select, separator, empty-state, page-header, stat. |
 | `src/components/layout/` | `AppShell`, `DesktopSidebar` / `SidebarNav`, `BottomNav`, `TopBar`, `AuthLayout`, `Brand`, `nav.ts`. |
 | `src/components/theme/` | Zustand theme store, provider, toggle. |
@@ -105,7 +108,7 @@ disabled in the Auth settings. Email provider on, with the GitHub Pages URL in *
 | --- | --- |
 | Identity (M2, shipped) | `profiles` (id = auth.users.id, email, full_name, role, status, preferred_language, support_language, preferences jsonb, onboarding_completed_at), `tutor_students` (tutor_id, student_id; one tutor per student), `invitations` (email, full_name, user_id, invited_by, status, sent_at, expires_at, resend_count, accepted_at, revoked_at), `account_events` (user_id, actor_id, event_type, metadata) |
 | Curriculum | `courses`, `curriculum_units` (level, chapter_number, version), `lessons`, `lesson_content` (versioned JSON), `exercise_definitions`, `assessments` |
-| Learning | `exercise_attempts`, `lesson_progress`, `chapter_access` (unlock/skip overrides), `skill_mastery`, `mistake_records`, `learning_activity` (timeline) |
+| Learning (M3, shipped) | `lesson_progress` (student, chapter, lesson, status, best/last score), `exercise_attempts` (client uuid id = idempotency key, answer jsonb, score), `chapter_access_overrides` (unlock/skip by tutor), `assessment_attempts` (server-graded chapter checks: answers, results, score, passed, expiry). Planned: `skill_mastery`, `mistake_records`, `learning_activity` |
 | Vocabulary | `vocabulary_items`, `vocabulary_sets`, `student_vocabulary` (stage, ease, due_at, recognition/recall stats), `vocabulary_reviews` |
 | Teaching | `assignments`, `assignment_submissions`, `teacher_notes`, `teacher_feedback` |
 | Speaking | `speaking_sessions`, `conversation_messages`, `recordings` (storage path, retention, consent) |
@@ -127,7 +130,8 @@ disabled in the Auth settings. Email provider on, with the GitHub Pages URL in *
   the `student-admin` function also bans the Auth user so refresh and sign-in are refused.
 
 **Edge Functions.** Shipped: `student-admin` (`invite`, `resend`, `revoke`, `set_status`;
-ADR-010). Planned for M7: `ai-chat`, `ai-transcribe`, `ai-speak` (TTS), `ai-evaluate`. Each
+ADR-010) and `assessment` (`start`, `submit`, `reset`; ADR-015, grades with the generated copy of
+the client engine under `supabase/functions/_shared`). Planned for M7: `ai-chat`, `ai-transcribe`, `ai-speak` (TTS), `ai-evaluate`. Each
 validates input with Zod, verifies the caller with the Auth server, checks the role in the
 database, and (M7) enforces quota and writes `ai_usage`. There is no bootstrap endpoint (ADR-011).
 

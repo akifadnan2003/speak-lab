@@ -212,3 +212,73 @@ test('password recovery through the emailed link', async ({ page }) => {
   await page.goto(relativeLink(link))
   await expect(page.getByTestId('auth-callback-error')).toBeVisible({ timeout: 30_000 })
 })
+
+test('student learns on this device, progress follows the account to another device, the chapter check stays locked, and the tutor can place the student', async ({ page, browser }) => {
+  test.setTimeout(180_000)
+  const email = uniqueEmail('e2e-learner')
+  const created = await admin.auth.admin.createUser({ email, password: STUDENT_PASSWORD, email_confirm: true, user_metadata: { full_name: 'Samir Test' } })
+  createdUsers.push(created.data.user!.id)
+  await admin.from('tutor_students').insert({ tutor_id: tutor.id, student_id: created.data.user!.id })
+  await admin.from('profiles').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', created.data.user!.id)
+
+  // Device 1: Learn -> chapter -> lesson, answer one exercise. Works through the navigation on
+  // both the desktop sidebar and the mobile bottom bar (two Playwright projects).
+  const device1 = await browser.newContext()
+  const student = await device1.newPage()
+  await login(student, email, STUDENT_PASSWORD)
+  await expect(student).toHaveURL(/#\/$/)
+  await student.getByRole('link', { name: 'Learn' }).first().click()
+  await expect(student.getByRole('heading', { name: 'Your curriculum' })).toBeVisible()
+  const firstChapter = student.getByTestId('chapter-card').first()
+  await expect(firstChapter).toHaveAttribute('data-status', 'available')
+  await firstChapter.getByRole('link').click()
+  await expect(student.getByRole('heading', { name: /Sentence structure/ })).toBeVisible()
+  await expect(student.getByTestId('lesson-row').last()).toHaveAttribute('data-status', 'locked')
+  await student.getByTestId('lesson-row').first().getByRole('link').click()
+  await expect(student.getByRole('heading', { name: 'English sentences: who + what' })).toBeVisible()
+  await expect(student.getByTestId('storage-label')).toHaveText('Progress saved to your account')
+  await student.getByRole('radio', { name: /She/ }).click()
+  await student.getByTestId('check-answer').click()
+  await expect(student.getByTestId('exercise-feedback')).toHaveAttribute('data-outcome', 'correct')
+  // The chapter check cannot be opened by URL while practice lessons are open.
+  await student.goto('./#/learn/a0-01/lessons/a0-01-l11')
+  await expect(student.getByText('This lesson is locked')).toBeVisible()
+  await logout(student)
+  await device1.close()
+
+  // Device 2: the same account sees the progress; nothing was left on device 1.
+  const device2 = await browser.newContext()
+  const again = await device2.newPage()
+  await login(again, email, STUDENT_PASSWORD)
+  await expect(again).toHaveURL(/#\/$/)
+  await again.goto('./#/learn/a0-01')
+  await expect(again.getByRole('heading', { name: /Sentence structure/ })).toBeVisible({ timeout: 30_000 })
+  await expect(again.getByTestId('lesson-row').first()).toHaveAttribute('data-status', 'in_progress', { timeout: 30_000 })
+  const rows = await admin.from('exercise_attempts').select('exercise_id, correct').eq('student_id', created.data.user!.id)
+  expect(rows.data).toEqual([{ exercise_id: 'a0-01-l01-e01', correct: true }])
+
+  // The tutor places the student at A2: A0 and A1 are skipped, the A2 showcase chapter opens.
+  await login(page, tutor.email, TUTOR_PASSWORD)
+  await page.getByTestId('student-card').filter({ hasText: email }).click()
+  await page.getByRole('tab', { name: 'Curriculum' }).click()
+  await expect(page.getByTestId('current-chapter')).toContainText('A0')
+  await page.getByTestId('place-at-level').selectOption('A2')
+  await expect(page.locator('[data-testid="tutor-chapter-row"][data-chapter="a0-01"]')).toHaveAttribute('data-status', 'skipped', { timeout: 30_000 })
+  await expect(page.locator('[data-testid="tutor-chapter-row"][data-chapter="a1-10"]')).toHaveAttribute('data-status', 'skipped')
+  // The A2 showcase chapter still sits behind the planned A2-01..06, so the tutor unlocks it directly.
+  const showcase = page.locator('[data-testid="tutor-chapter-row"][data-chapter="a2-07"]')
+  await expect(showcase).toHaveAttribute('data-status', 'locked')
+  await showcase.getByTestId('unlock-chapter').click()
+  await expect(showcase).toHaveAttribute('data-status', 'available', { timeout: 30_000 })
+  await expect(showcase.getByTestId('override-badge')).toHaveText('Unlocked by tutor')
+
+  // The learner's open page still holds the earlier progression; a reload picks up the tutor's change.
+  await again.goto('./#/learn')
+  await again.reload()
+  await expect(again.getByRole('heading', { name: 'Your curriculum' })).toBeVisible({ timeout: 30_000 })
+  await again.getByRole('button', { name: /^A2 / }).click()
+  await expect(again.getByTestId('chapter-card').nth(6)).toHaveAttribute('data-status', 'available', { timeout: 30_000 })
+  await again.getByTestId('chapter-card').nth(6).getByRole('link').click()
+  await expect(again.getByRole('heading', { name: /Past Continuous/ })).toBeVisible()
+  await device2.close()
+})

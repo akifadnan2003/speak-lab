@@ -102,7 +102,9 @@ jobs:
         run: supabase db push --remote="$SUPABASE_DB_URL" --dry-run
       - name: Deploy Edge Functions
         if: ${{ inputs.functions && !inputs.dry_run }}
-        run: supabase functions deploy student-admin --no-verify-jwt --yes
+        # Deploys every function in supabase/functions (student-admin, assessment). Both verify the
+        # caller themselves with auth.getUser(), hence --no-verify-jwt.
+        run: supabase functions deploy --no-verify-jwt --yes
       - name: Edge Function secrets
         if: ${{ inputs.functions && !inputs.dry_run }}
         run: |

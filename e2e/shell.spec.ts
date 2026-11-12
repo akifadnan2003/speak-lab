@@ -31,10 +31,10 @@ test.describe('deployment basics', () => {
 
   test('direct navigation and refresh survive on a deep hash route', async ({ page }) => {
     await setRole(page, 'student')
-    await page.goto('./#/learn/a2-07')
-    await expect(page.getByRole('heading', { name: /Past Continuous/ })).toBeVisible()
+    await page.goto('./#/learn/a0-01')
+    await expect(page.getByRole('heading', { name: /Sentence structure/ })).toBeVisible()
     await page.reload()
-    await expect(page.getByRole('heading', { name: /Past Continuous/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Sentence structure/ })).toBeVisible()
   })
 
   test('shows the preview banner so demo mode is explicit', async ({ page }) => {
@@ -63,17 +63,32 @@ test.describe('student navigation', () => {
     await expect(page.getByRole('heading', { name: 'Your learning record' })).toBeVisible()
   })
 
-  test('lesson workspace sample exercise is keyboard operable', async ({ page }) => {
+  test('lesson workspace exercise is keyboard operable and progress survives reload', async ({ page }) => {
     await setRole(page, 'student')
-    await page.goto('./#/learn/a2-07/lessons/a2-07-03')
-    await expect(page.getByRole('heading', { name: 'Listening: a strange evening' })).toBeVisible()
-    const option = page.getByRole('radio', { name: /was cooking/ })
+    await page.goto('./#/learn/a0-01/lessons/a0-01-l01')
+    await expect(page.getByRole('heading', { name: 'English sentences: who + what' })).toBeVisible()
+    const option = page.getByRole('radio', { name: /She/ })
     await option.focus()
     await page.keyboard.press('Enter')
     await expect(option).toHaveAttribute('aria-checked', 'true')
-    await page.getByRole('button', { name: 'Check answer' }).focus()
+    await page.getByTestId('check-answer').focus()
     await page.keyboard.press('Enter')
     await expect(page.getByText('Correct!')).toBeVisible()
+    await page.goto('./#/learn/a0-01')
+    await expect(page.getByTestId('lesson-row').first()).toHaveAttribute('data-status', 'in_progress')
+  })
+
+  test('sentence ordering works by tapping words', async ({ page }) => {
+    await setRole(page, 'student')
+    await page.goto('./#/learn/a0-01/lessons/a0-01-l02')
+    await expect(page.getByRole('heading', { name: 'am, is, are' })).toBeVisible()
+    // Jump to the last exercise ("It is a big city.") through the Next button.
+    for (let i = 0; i < 17; i++) await page.getByTestId('next-exercise').click()
+    await expect(page.getByText('Exercise 18 of 18')).toBeVisible()
+    const pool = page.getByTestId('ordering-pool')
+    for (const word of ['It', 'is', 'a', 'big', 'city.']) await pool.getByRole('button', { name: word, exact: true }).click()
+    await page.getByTestId('check-answer').click()
+    await expect(page.getByTestId('exercise-feedback')).toHaveAttribute('data-outcome', 'correct')
   })
 
   test('student cannot reach tutor routes', async ({ page }) => {

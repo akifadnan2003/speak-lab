@@ -24,6 +24,7 @@ import { useAuth } from '@/features/auth/AuthProvider'
 import { formatRelative } from '@/lib/utils'
 import { ACCOUNT_STATUS_LABEL, StudentAdminError, useStudent, useStudentAdmin, useStudentEvents, type AccountEvent, type StudentAccount } from './api'
 import { DemoStudentSections } from './DemoStudentSections'
+import { StudentCurriculumSection } from './StudentCurriculumSection'
 
 const SECTIONS = [
   'overview',
@@ -53,8 +54,7 @@ const SECTION_LABEL: Record<Section, string> = {
 }
 
 /** Which milestone delivers each placeholder section (kept honest in the UI). */
-const SECTION_MILESTONE: Record<Exclude<Section, 'overview' | 'history'>, string> = {
-  curriculum: 'M3 · Curriculum and exercise engine',
+const SECTION_MILESTONE: Record<Exclude<Section, 'overview' | 'history' | 'curriculum'>, string> = {
   grammar: 'M5 · Student progress',
   vocabulary: 'M4 · Vocabulary and revision',
   speaking: 'M7 · AI speaking',
@@ -74,6 +74,10 @@ const EVENT_LABEL: Record<AccountEvent['type'], string> = {
   account_disabled: 'Access disabled',
   account_reactivated: 'Access reactivated',
   onboarding_completed: 'Onboarding completed',
+  chapter_override_set: 'Chapter override set by tutor',
+  chapter_override_cleared: 'Chapter override removed',
+  assessment_submitted: 'Chapter check submitted',
+  assessment_reset: 'Chapter check retake allowed',
 }
 
 function isSection(value: string | undefined): value is Section {
@@ -163,6 +167,9 @@ export function StudentDetailPage() {
           <>
             <TabsContent value="overview">
               <AccountOverview account={account} />
+            </TabsContent>
+            <TabsContent value="curriculum">
+              <StudentCurriculumSection studentId={account.id} tutorId={tutorId} />
             </TabsContent>
             <TabsContent value="history">
               <AccountHistory studentId={account.id} />

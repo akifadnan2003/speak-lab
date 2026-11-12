@@ -1,16 +1,21 @@
-import { ArrowLeft, CheckCircle2, Circle, Lock, PlayCircle, SkipForward } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Circle, Lock, PenLine, PlayCircle, SkipForward } from 'lucide-react'
 import { Link, useParams } from 'react-router'
-import { DemoNotice } from '@/components/feedback/DemoNotice'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { PageHeader } from '@/components/ui/page-header'
 import { Progress } from '@/components/ui/progress'
-import { findChapter, LESSON_KIND_LABEL, type DemoLesson } from '@/demo/curriculum'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useCurrentUser } from '@/features/auth/AuthProvider'
+import { useProgression } from '@/features/curriculum/CurriculumProvider'
+import type { LessonStatus } from '@/features/curriculum/ports'
+import { nextLesson } from '@/features/curriculum/progression'
+import { LESSON_KIND_LABEL } from '@/features/curriculum/schema'
 import { cn } from '@/lib/utils'
+import { ChapterStatusBadge } from './ChapterStatusBadge'
 
-function LessonStatusIcon({ status }: { status: DemoLesson['status'] }) {
+function LessonStatusIcon({ status }: { status: LessonStatus }) {
   switch (status) {
     case 'completed':
       return <CheckCircle2 className="size-5 text-success" aria-label="Completed" />
@@ -27,9 +32,20 @@ function LessonStatusIcon({ status }: { status: DemoLesson['status'] }) {
 
 export function ChapterPage() {
   const { chapterId = '' } = useParams()
-  const chapter = findChapter(chapterId)
+  const user = useCurrentUser()
+  const { states, isLoading } = useProgression(user?.id ?? null)
+  const state = states?.get(chapterId)
 
-  if (!chapter) {
+  if (!states && isLoading) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    )
+  }
+
+  if (!state) {
     return (
       <EmptyState
         title="Chapter not found"
@@ -43,7 +59,9 @@ export function ChapterPage() {
     )
   }
 
-  const nextLesson = chapter.lessons.find((l) => l.status === 'in_progress' || l.status === 'available')
+  const { chapter } = state
+  const next = nextLesson(state)
+  const passMark = chapter.completion.passMark
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,67 +75,84 @@ export function ChapterPage() {
         title={chapter.title}
         description={chapter.description}
         actions={
-          nextLesson ? (
+          next && state.status !== 'locked' ? (
             <Button asChild size="lg">
-              <Link to={`/learn/${chapter.id}/lessons/${nextLesson.id}`}>
-                <PlayCircle aria-hidden /> {chapter.progress > 0 ? 'Continue' : 'Start chapter'}
+              <Link to={`/learn/${chapter.id}/lessons/${next.lesson.id}`}>
+                <PlayCircle aria-hidden /> {state.progress > 0 ? 'Continue' : 'Start chapter'}
               </Link>
             </Button>
-          ) : null
+          ) : (
+            <ChapterStatusBadge state={state} />
+          )
         }
       />
 
+      {state.status === 'locked' ? (
+        <div className="flex gap-3 rounded-lg bg-warning-soft p-3 text-sm text-warning-soft-fg" role="status">
+          <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p>
+            Complete {state.missingPrerequisites.map((id) => states?.get(id)?.chapter.title ?? id).join(', ')} first, or ask your tutor
+            to unlock this chapter.
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle>Lessons</CardTitle>
-              <span className="text-sm text-fg-muted tabular">{chapter.progress}% complete</span>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 pt-3">
-              <Progress value={chapter.progress} size="sm" />
-              <ol className="mt-2 flex flex-col divide-y divide-line">
-                {chapter.lessons.map((lesson, index) => {
-                  const locked = lesson.status === 'locked'
-                  const row = (
-                    <div
-                      className={cn(
-                        'flex items-center gap-3 py-3',
-                        !locked && 'transition-colors group-hover:text-primary',
-                      )}
-                    >
-                      <LessonStatusIcon status={lesson.status} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {index + 1}. {lesson.title}
-                        </p>
-                        <p className="text-xs text-fg-muted">
-                          {LESSON_KIND_LABEL[lesson.kind]} · {lesson.estimatedMinutes} min
-                        </p>
+          {chapter.status === 'planned' ? (
+            <EmptyState
+              icon={PenLine}
+              title="This chapter is not written yet"
+              description="Its objectives are fixed; lessons and exercises are still being authored. Your tutor will tell you when it opens."
+            />
+          ) : (
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle>Lessons</CardTitle>
+                <span className="text-sm text-fg-muted tabular">{state.progress}% complete</span>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 pt-3">
+                <Progress value={state.progress} size="sm" />
+                <ol className="mt-2 flex flex-col divide-y divide-line">
+                  {state.lessons.map((lessonState, index) => {
+                    const { lesson, status, bestScore } = lessonState
+                    const locked = status === 'locked'
+                    const row = (
+                      <div className={cn('flex items-center gap-3 py-3', !locked && 'transition-colors group-hover:text-primary')}>
+                        <LessonStatusIcon status={status} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">
+                            {index + 1}. {lesson.title}
+                          </p>
+                          <p className="text-xs text-fg-muted">
+                            {LESSON_KIND_LABEL[lesson.kind]} · {lesson.estimatedMinutes} min
+                            {lesson.kind === 'assessment' ? ` · pass mark ${passMark}%` : ''}
+                          </p>
+                        </div>
+                        {typeof bestScore === 'number' && lesson.kind !== 'speaking' ? (
+                          <Badge variant={bestScore >= passMark ? 'success' : 'warning'}>{bestScore}%</Badge>
+                        ) : null}
                       </div>
-                      {typeof lesson.score === 'number' ? (
-                        <Badge variant={lesson.score >= 80 ? 'success' : 'warning'}>{lesson.score}%</Badge>
-                      ) : null}
-                    </div>
-                  )
-                  return (
-                    <li key={lesson.id}>
-                      {locked ? (
-                        <div className="opacity-60">{row}</div>
-                      ) : (
-                        <Link
-                          to={`/learn/${chapter.id}/lessons/${lesson.id}`}
-                          className="group block rounded-md focus-visible:outline-2 focus-visible:outline-ring"
-                        >
-                          {row}
-                        </Link>
-                      )}
-                    </li>
-                  )
-                })}
-              </ol>
-            </CardContent>
-          </Card>
+                    )
+                    return (
+                      <li key={lesson.id} data-testid="lesson-row" data-status={status}>
+                        {locked ? (
+                          <div className="opacity-60">{row}</div>
+                        ) : (
+                          <Link
+                            to={`/learn/${chapter.id}/lessons/${lesson.id}`}
+                            className="group block rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+                          >
+                            {row}
+                          </Link>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ol>
+              </CardContent>
+            </Card>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <Card>
@@ -135,7 +170,18 @@ export function ChapterPage() {
               </ul>
             </CardContent>
           </Card>
-          <DemoNotice>Demo chapter. The real content engine arrives in M3.</DemoNotice>
+          <Card>
+            <CardHeader>
+              <CardTitle>How to complete this chapter</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 text-sm text-fg-muted">
+              <ul className="flex flex-col gap-1.5">
+                <li>Finish every lesson.</li>
+                {chapter.completion.requireSpeaking ? <li>Complete the speaking lessons (they cannot be skipped).</li> : null}
+                {chapter.completion.requireAssessment ? <li>Score at least {passMark}% in the chapter check.</li> : null}
+              </ul>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

@@ -433,3 +433,8 @@ enabled = true
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/student-admin/index.ts"
+
+[functions.assessment]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/assessment/index.ts"

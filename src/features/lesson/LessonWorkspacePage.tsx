@@ -1,50 +1,56 @@
-import { ArrowLeft, ArrowRight, BookOpen, Languages, Lightbulb } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, ArrowRight, BookOpen, ClipboardCheck, Cloud, Languages, Loader2, Lock, Smartphone } from 'lucide-react'
+import { useCallback, useId, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { DemoNotice } from '@/components/feedback/DemoNotice'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { findLesson, LESSON_KIND_LABEL } from '@/demo/curriculum'
-import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { useCurrentUser } from '@/features/auth/AuthProvider'
+import { AzHelpProvider, useAzHelp } from '@/features/curriculum/az-help'
+import { attemptsRemaining, countUsedAttempts, MAX_ASSESSMENT_ATTEMPTS, openAttempt } from '@/features/curriculum/assessment-rules'
+import {
+  useAssessmentActions,
+  useAssessmentAttempts,
+  useCurriculumServices,
+  useProgression,
+  useProgressMutations,
+} from '@/features/curriculum/CurriculumProvider'
+import type { AssessmentAttemptSummary, LessonProgressRecord } from '@/features/curriculum/ports'
+import { isLessonDone, type ChapterState, type LessonState } from '@/features/curriculum/progression'
+import { LESSON_KIND_LABEL, type Chapter, type Lesson } from '@/features/curriculum/schema'
+import { ExerciseRunner, type AttemptEvent, type RunSummary } from '@/features/exercises/components/ExerciseRunner'
+import { LessonContent } from './LessonContent'
 
-/**
- * Lesson workspace shell. In M3 the right-hand panel becomes the exercise
- * renderer driven by versioned content. The sample exercise below is a static
- * multiple-choice preview that exercises the layout, keyboard navigation and
- * the explanation dialog; it stores nothing.
- */
-const SAMPLE_QUESTION = {
-  prompt: 'I ___ dinner when the phone rang.',
-  options: ['cooked', 'was cooking', 'am cooking', 'cook'],
-  correct: 1,
-  explanation:
-    'The phone ringing interrupted an action in progress, so the longer background action takes the Past Continuous: was cooking.',
-  azExplanation:
-    'Telefon zəng çalanda yemək bişirmək davam edirdi. Davam edən (fon) hərəkət üçün Past Continuous işlədilir: was cooking.',
+function newId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `att-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 export function LessonWorkspacePage() {
   const { chapterId = '', lessonId = '' } = useParams()
-  const found = findLesson(chapterId, lessonId)
-  const [selected, setSelected] = useState<number | null>(null)
-  const [checked, setChecked] = useState(false)
+  const user = useCurrentUser()
+  const { states, isLoading } = useProgression(user?.id ?? null)
+  const chapterState = states?.get(chapterId)
+  const lessonState = chapterState?.lessons.find((l) => l.lesson.id === lessonId)
 
-  if (!found) {
+  if (!states && isLoading) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    )
+  }
+
+  if (!user || !chapterState || !lessonState) {
     return (
       <EmptyState
         title="Lesson not found"
-        description="This lesson does not exist or is locked."
+        description="This lesson does not exist or is not available to you."
         action={
           <Button asChild variant="outline">
             <Link to="/learn">Back to curriculum</Link>
@@ -54,11 +60,119 @@ export function LessonWorkspacePage() {
     )
   }
 
-  const { chapter, lesson } = found
-  const index = chapter.lessons.findIndex((l) => l.id === lesson.id)
-  const prev = index > 0 ? chapter.lessons[index - 1] : undefined
-  const next = chapter.lessons[index + 1]
-  const isCorrect = checked && selected === SAMPLE_QUESTION.correct
+  if (lessonState.status === 'locked') {
+    return (
+      <EmptyState
+        icon={Lock}
+        title="This lesson is locked"
+        description={
+          lessonState.lesson.kind === 'assessment'
+            ? 'Finish every other lesson in the chapter to unlock the chapter check.'
+            : 'Complete the previous chapters first, or ask your tutor to unlock this one.'
+        }
+        action={
+          <Button asChild variant="outline">
+            <Link to={`/learn/${chapterId}`}>Back to chapter</Link>
+          </Button>
+        }
+      />
+    )
+  }
+
+  return (
+    <AzHelpProvider>
+      <LessonWorkspace key={lessonId} studentId={user.id} chapterState={chapterState} lessonState={lessonState} />
+    </AzHelpProvider>
+  )
+}
+
+function LessonWorkspace({
+  studentId,
+  chapterState,
+  lessonState,
+}: {
+  studentId: string
+  chapterState: ChapterState
+  lessonState: LessonState
+}) {
+  const { chapter, lessons } = chapterState
+  const { lesson } = lessonState
+  const index = lessons.findIndex((l) => l.lesson.id === lesson.id)
+  const prev = index > 0 ? lessons[index - 1] : undefined
+  const next = lessons[index + 1]
+  const nextOpen = next && next.status !== 'locked'
+  const { upsertLesson, recordAttempt } = useProgressMutations(studentId)
+  const { storage } = useCurriculumServices()
+  const az = useAzHelp()
+  const azId = useId()
+  const hasAz = lessonHasAz(lesson)
+
+  const onStart = useCallback(() => {
+    if (isLessonDone(lessonState.status) || lessonState.status === 'in_progress') return
+    const record: LessonProgressRecord = {
+      studentId,
+      chapterId: chapter.id,
+      lessonId: lesson.id,
+      status: 'in_progress',
+      updatedAt: new Date().toISOString(),
+    }
+    upsertLesson.mutate(record)
+  }, [studentId, chapter.id, lesson.id, lessonState.status, upsertLesson])
+
+  const onAttempt = useCallback(
+    (event: AttemptEvent) => {
+      recordAttempt.mutate({
+        id: newId(),
+        studentId,
+        chapterId: chapter.id,
+        chapterVersion: chapter.version,
+        lessonId: lesson.id,
+        exerciseId: event.exercise.id,
+        exerciseType: event.exercise.type,
+        attemptNumber: event.attemptNumber,
+        answer: event.answer,
+        correct: event.result.correct,
+        score: event.result.score,
+        hintUsed: event.hintUsed,
+        createdAt: new Date().toISOString(),
+      })
+    },
+    [studentId, chapter, lesson.id, recordAttempt],
+  )
+
+  const onComplete = useCallback(
+    (summary: RunSummary) => {
+      // Practice lessons only: chapter checks are graded and recorded by the assessment gateway.
+      if (lesson.kind === 'assessment') return
+      const previousBest = lessonState.bestScore ?? 0
+      const now = new Date().toISOString()
+      const record: LessonProgressRecord = {
+        studentId,
+        chapterId: chapter.id,
+        lessonId: lesson.id,
+        status: 'completed',
+        bestScore: Math.max(previousBest, summary.score),
+        lastScore: summary.score,
+        completedAt: now,
+        updatedAt: now,
+      }
+      upsertLesson.mutate(record)
+    },
+    [studentId, chapter, lesson, lessonState.bestScore, upsertLesson],
+  )
+
+  const hasExplanation = lesson.blocks.length > 0
+  const summaryActions = nextOpen ? (
+    <Button asChild>
+      <Link to={`/learn/${chapter.id}/lessons/${next.lesson.id}`}>
+        Next lesson <ArrowRight aria-hidden />
+      </Link>
+    </Button>
+  ) : (
+    <Button asChild>
+      <Link to={`/learn/${chapter.id}`}>Back to chapter</Link>
+    </Button>
+  )
 
   return (
     <div className="flex flex-col gap-5">
@@ -70,140 +184,71 @@ export function LessonWorkspacePage() {
         </Button>
         <div className="flex items-center gap-2 text-xs text-fg-muted">
           <span className="tabular">
-            Lesson {index + 1} of {chapter.lessons.length}
+            Lesson {index + 1} of {lessons.length}
           </span>
-          <Progress value={((index + 1) / chapter.lessons.length) * 100} size="sm" className="w-24" />
+          <Progress value={((index + 1) / lessons.length) * 100} size="sm" className="w-24" aria-label="Position in chapter" />
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="primary">{LESSON_KIND_LABEL[lesson.kind]}</Badge>
-          <Badge variant="neutral">{lesson.estimatedMinutes} min</Badge>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="primary">{LESSON_KIND_LABEL[lesson.kind]}</Badge>
+            <Badge variant="neutral">{lesson.estimatedMinutes} min</Badge>
+            {lessonState.status === 'completed' ? <Badge variant="success">Completed</Badge> : null}
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{lesson.title}</h1>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{lesson.title}</h1>
+        {hasAz ? (
+          <div className="flex items-center gap-2">
+            <Switch id={azId} checked={az.enabled} onCheckedChange={az.setEnabled} aria-describedby={`${azId}-hint`} />
+            <Label htmlFor={azId} className="flex items-center gap-1.5">
+              <Languages className="size-4 text-primary" aria-hidden /> Azerbaijani help
+            </Label>
+            <span id={`${azId}-hint`} className="sr-only">
+              Shows Azerbaijani explanations under the English text.
+            </span>
+          </div>
+        ) : null}
       </div>
+
+      {lesson.objectives.length > 0 ? (
+        <ul className="flex flex-wrap gap-2 text-xs text-fg-muted">
+          {lesson.objectives.map((o) => (
+            <li key={o} className="rounded-full bg-surface-2 px-2.5 py-1">
+              {o}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-        {/* Explanation panel */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-center gap-2">
-            <BookOpen className="size-4 text-primary" aria-hidden />
-            <CardTitle>Explanation</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4 pt-3 text-sm leading-relaxed">
-            <p>
-              Use the <strong>Past Continuous</strong> (was / were + -ing) for an action that was in
-              progress, and the <strong>Past Simple</strong> for the shorter action that interrupted
-              it.
-            </p>
-            <ul className="flex flex-col gap-2 rounded-lg bg-surface-2 p-3">
-              <li>
-                I <em>was cooking</em> when the phone <em>rang</em>.
-              </li>
-              <li>
-                They <em>were walking</em> home while it <em>started</em> to rain.
-              </li>
-            </ul>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="w-fit">
-                  <Languages aria-hidden /> Explain in Azerbaijani
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Azərbaycan dilində izah</DialogTitle>
-                  <DialogDescription>
-                    Keçmişdə davam edən hərəkət üçün Past Continuous, onu kəsən qısa hərəkət üçün Past
-                    Simple işlədilir.
-                  </DialogDescription>
-                </DialogHeader>
-                <p className="text-sm">
-                  Məsələn: <em>I was cooking when the phone rang.</em> Burada &ldquo;was
-                  cooking&rdquo; fon hərəkətdir, &ldquo;rang&rdquo; isə onu kəsən hadisədir.
-                </p>
-                <DemoNotice>Static sample. Azerbaijani support becomes dynamic in M8.</DemoNotice>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
+        {hasExplanation ? (
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex-row items-center gap-2">
+              <BookOpen className="size-4 text-primary" aria-hidden />
+              <CardTitle>{lesson.kind === 'reading' ? 'Text' : lesson.kind === 'vocabulary' ? 'Words' : 'Explanation'}</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-3">
+              <LessonContent blocks={lesson.blocks} />
+            </CardContent>
+          </Card>
+        ) : null}
 
-        {/* Exercise panel */}
-        <Card className="lg:col-span-3">
+        <Card className={hasExplanation ? 'lg:col-span-3' : 'lg:col-span-5'}>
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Practice</CardTitle>
-            <DemoNotice>Sample exercise, not saved.</DemoNotice>
+            <CardTitle>{lesson.kind === 'assessment' ? 'Chapter check' : 'Practice'}</CardTitle>
+            <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" data-testid="storage-label">
+              {storage === 'device' ? <Smartphone className="size-3.5" aria-hidden /> : <Cloud className="size-3.5" aria-hidden />}
+              {storage === 'device' ? 'Progress saved on this device' : 'Progress saved to your account'}
+            </span>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 pt-3">
-            <p className="text-base font-medium" id="sample-question">
-              {SAMPLE_QUESTION.prompt}
-            </p>
-            <div role="radiogroup" aria-labelledby="sample-question" className="flex flex-col gap-2">
-              {SAMPLE_QUESTION.options.map((option, i) => {
-                const active = selected === i
-                const showCorrect = checked && i === SAMPLE_QUESTION.correct
-                const showWrong = checked && active && i !== SAMPLE_QUESTION.correct
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    disabled={checked}
-                    onClick={() => setSelected(i)}
-                    className={cn(
-                      'flex min-h-12 items-center gap-3 rounded-lg border px-4 text-left text-sm transition-colors',
-                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                      active && !checked && 'border-primary bg-primary-soft text-primary-soft-fg',
-                      !active && !checked && 'border-line hover:border-line-strong hover:bg-surface-2',
-                      showCorrect && 'border-success bg-success-soft text-success-soft-fg',
-                      showWrong && 'border-danger bg-danger-soft text-danger-soft-fg',
-                      checked && !showCorrect && !showWrong && 'border-line opacity-60',
-                    )}
-                  >
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-current text-xs font-semibold">
-                      {String.fromCharCode(65 + i)}
-                    </span>
-                    {option}
-                  </button>
-                )
-              })}
-            </div>
-
-            {checked ? (
-              <div
-                role="status"
-                className={cn(
-                  'flex gap-3 rounded-lg p-3 text-sm',
-                  isCorrect ? 'bg-success-soft text-success-soft-fg' : 'bg-warning-soft text-warning-soft-fg',
-                )}
-              >
-                <Lightbulb className="mt-0.5 size-4 shrink-0" aria-hidden />
-                <div>
-                  <p className="font-semibold">{isCorrect ? 'Correct!' : 'Not quite.'}</p>
-                  <p>{SAMPLE_QUESTION.explanation}</p>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap items-center gap-2">
-              {!checked ? (
-                <Button onClick={() => setChecked(true)} disabled={selected === null}>
-                  Check answer
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setChecked(false)
-                    setSelected(null)
-                  }}
-                >
-                  Try again
-                </Button>
-              )}
-            </div>
+          <CardContent className="pt-3">
+            {lesson.kind === 'assessment' ? (
+              <AssessmentWorkspace studentId={studentId} chapter={chapter} lesson={lesson} summaryActions={summaryActions} />
+            ) : (
+              <ExerciseRunner lesson={lesson} onStart={onStart} onAttempt={onAttempt} onComplete={onComplete} summaryActions={summaryActions} />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -211,16 +256,16 @@ export function LessonWorkspacePage() {
       <nav aria-label="Lesson navigation" className="flex items-center justify-between gap-3 border-t border-line pt-4">
         {prev ? (
           <Button asChild variant="ghost">
-            <Link to={`/learn/${chapter.id}/lessons/${prev.id}`}>
+            <Link to={`/learn/${chapter.id}/lessons/${prev.lesson.id}`}>
               <ArrowLeft aria-hidden /> Previous
             </Link>
           </Button>
         ) : (
           <span />
         )}
-        {next && next.status !== 'locked' ? (
-          <Button asChild>
-            <Link to={`/learn/${chapter.id}/lessons/${next.id}`}>
+        {nextOpen ? (
+          <Button asChild variant="outline">
+            <Link to={`/learn/${chapter.id}/lessons/${next.lesson.id}`}>
               Next lesson <ArrowRight aria-hidden />
             </Link>
           </Button>
@@ -231,5 +276,137 @@ export function LessonWorkspacePage() {
         )}
       </nav>
     </div>
+  )
+}
+
+/**
+ * Chapter check: the server opens the attempt, grades the raw answers and decides what may be
+ * disclosed. The runner only collects answers. Attempts, retakes and expiry follow
+ * `assessment-rules.ts` on both sides.
+ */
+function AssessmentWorkspace({
+  studentId,
+  chapter,
+  lesson,
+  summaryActions,
+}: {
+  studentId: string
+  chapter: Chapter
+  lesson: Lesson
+  summaryActions: React.ReactNode
+}) {
+  const attempts = useAssessmentAttempts(studentId, chapter.id, lesson.id)
+  const { start, submit } = useAssessmentActions(studentId)
+  // The attempt the learner is working on right now. `null` shows the intro / result card.
+  const [active, setActive] = useState<AssessmentAttemptSummary | null>(null)
+
+  if (attempts.isPending) {
+    return <Skeleton className="h-40 w-full" aria-busy />
+  }
+  if (attempts.isError) {
+    return <EmptyState compact title="Could not load your attempts" description={attempts.error.message} />
+  }
+
+  const all = attempts.data
+  const used = countUsedAttempts(all, chapter.version)
+  const remaining = attemptsRemaining(used)
+  const submitted = all.filter((a) => a.status === 'submitted' && a.chapterVersion === chapter.version)
+  const best = submitted.length ? Math.max(...submitted.map((a) => a.score ?? 0)) : undefined
+  const passed = submitted.some((a) => a.passed)
+  const open = openAttempt(all)
+  const current = active ?? open ?? null
+
+  const begin = () => {
+    start.mutate({ chapterId: chapter.id, lessonId: lesson.id }, { onSuccess: (result) => setActive(result.attempt) })
+  }
+
+  if (current) {
+    return (
+      <ExerciseRunner
+        key={current.id}
+        lesson={lesson}
+        mode="assessment"
+        passMark={chapter.completion.passMark}
+        summaryActions={summaryActions}
+        assessment={{
+          attemptsUsed: used,
+          attemptsAllowed: MAX_ASSESSMENT_ATTEMPTS,
+          submit: (answers) => submit.mutateAsync({ attemptId: current.id, answers }),
+          onRetake: () => {
+            setActive(null)
+            begin()
+          },
+        }}
+      />
+    )
+  }
+
+  const questions = lesson.exercises.length
+  return (
+    <div className="flex flex-col gap-4" data-testid="assessment-intro">
+      <div className="flex gap-3 rounded-lg bg-surface-2 p-4 text-sm">
+        <ClipboardCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+        <div className="flex flex-col gap-1.5">
+          <p className="font-medium">
+            {questions} questions, one answer each. Pass mark {chapter.completion.passMark}%.
+          </p>
+          <p className="text-fg-muted">
+            Your answers are graded by the server when you submit. You have {MAX_ASSESSMENT_ATTEMPTS} attempts. Correct answers are
+            shown after you pass or use your last attempt.
+          </p>
+          <p className="text-fg-muted tabular" data-testid="assessment-status">
+            {used === 0 ? 'No attempts yet.' : `${used} of ${MAX_ASSESSMENT_ATTEMPTS} attempts used.`}
+            {typeof best === 'number' ? ` Best score ${best}%.` : ''}
+            {passed ? ' Passed.' : ''}
+          </p>
+        </div>
+      </div>
+      {start.isError ? (
+        <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger-soft-fg" data-testid="assessment-error">
+          {start.error.message}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {remaining > 0 ? (
+          <Button onClick={begin} disabled={start.isPending} data-testid="start-assessment">
+            {start.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <ClipboardCheck aria-hidden />}
+            {used === 0 ? 'Start chapter check' : passed ? 'Retake to improve' : 'Try again'}
+          </Button>
+        ) : (
+          <p className="text-sm text-fg-muted" data-testid="assessment-exhausted">
+            No attempts left. Ask your tutor to allow another attempt.
+          </p>
+        )}
+        {passed ? summaryActions : null}
+      </div>
+    </div>
+  )
+}
+
+function lessonHasAz(lesson: Lesson): boolean {
+  const blockHasAz = lesson.blocks.some((b) => {
+    switch (b.type) {
+      case 'paragraph':
+      case 'tip':
+        return !!b.text.az
+      case 'examples':
+        return b.items.some((i) => !!i.az)
+      case 'vocabulary':
+        return b.items.some((i) => !!i.translation)
+      case 'dialogue':
+        return b.lines.some((l) => !!l.az)
+      default:
+        return false
+    }
+  })
+  if (blockHasAz) return true
+  return lesson.exercises.some(
+    (e) =>
+      !!e.hint?.az ||
+      !!e.explanation?.az ||
+      !!e.instruction?.az ||
+      (e.type === 'speaking_prompt' && !!e.prompt.az) ||
+      (e.type === 'guided_writing' && !!e.prompt.az) ||
+      (e.type === 'sentence_transformation' && !!e.transformation.az),
   )
 }

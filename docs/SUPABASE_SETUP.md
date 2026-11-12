@@ -189,7 +189,7 @@ For `npm run dev` against the local stack put the values from `supabase status` 
 | Situation | Action |
 | --- | --- |
 | Bad frontend release | Re-run **Deploy to GitHub Pages** from the previous good commit (`gh workflow run deploy.yml --ref <sha>`), or revert the commit on `main`. The backend is unaffected. |
-| Edge Function regression | `supabase functions deploy student-admin --no-verify-jwt` from the previous commit (or re-run the manual workflow on that commit). The function is stateless. |
+| Edge Function regression | `supabase functions deploy --no-verify-jwt --yes` from the previous commit (or re-run the manual workflow on that commit). Both functions (`student-admin`, `assessment`) are stateless. |
 | Migration problem | Migrations are forward-only. Write a new migration that reverses the change (`supabase migration new revert_x`), run it through the manual workflow. Never `db reset` a hosted project. |
 | Leaked publishable key | Harmless by design (RLS), but rotate it in the dashboard and update the repository variable. |
 | Leaked secret / service key | Rotate immediately in the dashboard (API keys). Edge Function secrets are injected by the platform and pick up the new key automatically. |
@@ -202,7 +202,8 @@ For `npm run dev` against the local stack put the values from `supabase status` 
 - [ ] Redirect URLs include the GitHub Pages URL.
 - [ ] Custom SMTP configured and verified (section 1.3).
 - [ ] Invite and Reset-password templates replaced (section 1.4).
-- [ ] Manual backend workflow run successfully (migration applied, function deployed).
+- [ ] Manual backend workflow run successfully (migrations applied, both functions deployed).
+- [ ] After the M3 integration merges: run the workflow again so `20261111150000_curriculum_progress.sql` and the `assessment` function reach the hosted project (dry run first).
 - [ ] Owner user created and `bootstrap_owner` returned `bootstrapped`.
 - [ ] Owner can sign in on the live site and sees **My Students** with zero students.
 - [ ] Send yourself a test invitation to a second email address and complete the flow on a phone.

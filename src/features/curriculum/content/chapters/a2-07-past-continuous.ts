@@ -1,0 +1,323 @@
+import type { ChapterInput, LessonInput } from '../../schema'
+import { ec, fb, gw, match, mc, ord, qf, sp, st, t } from '../authoring'
+
+/**
+ * A2 · Chapter 7 — Past Continuous, when / while and interrupted actions.
+ *
+ * The exercise-engine showcase carried over from M1 (the "I ___ dinner when the phone rang"
+ * sample and its Azerbaijani explanation live in lesson 3). It sits at its real place in the
+ * A2 sequence: learners reach it by completing A2-06 or through tutor placement, never as the
+ * default starting point.
+ */
+
+const L01: LessonInput = {
+  id: 'a2-07-l01',
+  title: 'was / were + -ing',
+  kind: 'grammar',
+  estimatedMinutes: 12,
+  objectives: ['Form the Past Continuous with was / were + -ing', 'Describe what was happening at a moment in the past'],
+  blocks: [
+    { type: 'heading', text: 'An action in progress in the past' },
+    {
+      type: 'paragraph',
+      text: t(
+        'Use the Past Continuous (was / were + verb-ing) for an action that was in progress at a moment in the past. It describes the background: what was going on, not what happened next.',
+        'Past Continuous (was / were + fel-ing) keçmişdə müəyyən anda davam edən hərəkəti bildirir. O, fonu təsvir edir: nə baş verirdi, sonra nə oldu yox.',
+      ),
+    },
+    {
+      type: 'table',
+      caption: 'Forms',
+      columns: ['Subject', 'Positive', 'Negative', 'Question'],
+      rows: [
+        ['I / he / she / it', 'was working', "wasn't working", 'Was she working?'],
+        ['you / we / they', 'were working', "weren't working", 'Were they working?'],
+      ],
+    },
+    {
+      type: 'examples',
+      title: 'At eight o’clock last night…',
+      items: [
+        { en: 'I was cooking dinner.', az: 'Mən şam yeməyi bişirirdim.' },
+        { en: 'They were watching a film.', az: 'Onlar film izləyirdilər.' },
+        { en: 'She wasn’t sleeping. She was reading.', az: 'O yatmırdı. O oxuyurdu.' },
+        { en: 'Were you working at 8 pm?', az: 'Saat 8-də işləyirdin?' },
+      ],
+    },
+    {
+      type: 'tip',
+      text: t(
+        'Spelling: make → making, sit → sitting, lie → lying. The -ing form never changes with the subject; only was / were does.',
+        'Yazılış: make → making, sit → sitting, lie → lying. -ing forması mübtədaya görə dəyişmir; yalnız was / were dəyişir.',
+      ),
+    },
+  ],
+  exercises: [
+    mc('a2-07-l01-e01', 'At 7 pm yesterday I ___ dinner.', ['was cooking', 'were cooking', 'cooked', 'am cooking'], 0, {
+      explanation: t('I takes was, and the action was in progress at 7 pm.', '"I" ilə "was" işlənir; hərəkət saat 7-də davam edirdi.'),
+    }),
+    mc('a2-07-l01-e02', 'They ___ football when it started to rain.', ['was playing', 'were playing', 'played', 'play'], 1, {
+      explanation: t('They takes were.', '"They" ilə "were" işlənir.'),
+    }),
+    fb('a2-07-l01-e03', 'She ___ (read) a book at midnight.', ['was reading'], {
+      hint: t('was / were + verb-ing'),
+    }),
+    fb('a2-07-l01-e04', 'We ___ (not / sleep) at 2 am. We ___ (talk).', [["weren't sleeping", 'were not sleeping'], ['were talking']]),
+    fb('a2-07-l01-e05', '___ you ___ (work) at nine o’clock?', ['Were', 'working']),
+    ord('a2-07-l01-e06', 'He was waiting for the bus.'),
+    ord('a2-07-l01-e07', 'Were they studying last night?'),
+    ec('a2-07-l01-e08', 'I were watching TV at ten.', ['I was watching TV at ten.'], {
+      explanation: t('I takes was, not were.'),
+    }),
+    ec('a2-07-l01-e09', 'She was siting in the garden.', ['She was sitting in the garden.'], {
+      explanation: t('Double the final consonant: sit → sitting.', 'Son samit qoşalaşır: sit → sitting.'),
+    }),
+    st('a2-07-l01-e10', 'They were listening to music.', t('Make it negative.', 'İnkar edin.'), ["They weren't listening to music.", 'They were not listening to music.']),
+    st('a2-07-l01-e11', 'He was driving to work.', t('Make it a question.', 'Sual edin.'), ['Was he driving to work?']),
+    qf('a2-07-l01-e12', 'you / sleep / at midnight ?', ['Were you sleeping at midnight?']),
+    match(
+      'a2-07-l01-e13',
+      [
+        ['make', 'making'],
+        ['run', 'running'],
+        ['lie', 'lying'],
+        ['write', 'writing'],
+      ],
+      { prompt: 'Match the verb with its -ing form.' },
+    ),
+    sp('a2-07-l01-e14', t('Say what you were doing at 8 pm yesterday.', 'Dünən saat 8-də nə etdiyinizi deyin.'), 'At 8 pm yesterday I was having dinner with my family.', [
+      'I used was + -ing',
+      'I said the time',
+      'I said a full sentence',
+    ]),
+    sp('a2-07-l01-e15', t('Say what two friends were doing while you were studying.'), 'While I was studying, Aysel was cooking and Rashad was playing games.', [
+      'I used were / was correctly',
+      'I named two people',
+    ]),
+  ],
+}
+
+const L02: LessonInput = {
+  id: 'a2-07-l02',
+  title: 'When and while',
+  kind: 'grammar',
+  estimatedMinutes: 12,
+  objectives: ['Combine the Past Continuous with the Past Simple', 'Use when and while to show an interruption'],
+  blocks: [
+    { type: 'heading', text: 'Background and interruption' },
+    {
+      type: 'paragraph',
+      text: t(
+        'Use the Past Continuous for the longer background action and the Past Simple for the shorter action that interrupted it. "While" usually introduces the long action; "when" usually introduces the short one.',
+        'Uzun fon hərəkəti üçün Past Continuous, onu kəsən qısa hərəkət üçün Past Simple işlədilir. "While" adətən uzun hərəkəti, "when" isə qısa hərəkəti başladır.',
+      ),
+    },
+    {
+      type: 'examples',
+      items: [
+        { en: 'I was cooking when the phone rang.', az: 'Telefon zəng çalanda yemək bişirirdim.', note: 'background → interruption' },
+        { en: 'While they were walking home, it started to rain.', az: 'Onlar evə gedərkən yağış başladı.' },
+        { en: 'When I arrived, she was sleeping.', az: 'Mən gələndə o yatırdı.', note: 'short action first, then background' },
+      ],
+    },
+    {
+      type: 'tip',
+      tone: 'warning',
+      text: t('Two short actions in sequence both take the Past Simple: When the phone rang, I answered it.', 'Ardıcıl iki qısa hərəkət hər ikisi Past Simple-da olur: When the phone rang, I answered it.'),
+    },
+  ],
+  exercises: [
+    mc('a2-07-l02-e01', 'We ___ TV when the lights went out.', ['were watching', 'watched', 'watch', 'are watching'], 0),
+    mc('a2-07-l02-e02', 'While I was running, I ___ my keys.', ['was dropping', 'dropped', 'drop', 'am dropping'], 1, {
+      explanation: t('Dropping the keys is the short, completed event.', 'Açarı salmaq qısa, bitmiş hadisədir.'),
+    }),
+    mc('a2-07-l02-e03', '___ she was studying, her brother was playing the piano.', ['When', 'While', 'Because', 'So'], 1, {
+      explanation: t('Two long background actions at the same time: while.'),
+    }),
+    fb('a2-07-l02-e04', 'He ___ (fall) asleep while he ___ (watch) the film.', [['fell'], ['was watching']]),
+    fb('a2-07-l02-e05', 'When the teacher ___ (come) in, the students ___ (talk).', [['came'], ['were talking']]),
+    fb('a2-07-l02-e06', 'I ___ (see) an old friend while I ___ (wait) for the bus.', [['saw'], ['was waiting']]),
+    ord('a2-07-l02-e07', 'She was reading when the doorbell rang.'),
+    ord('a2-07-l02-e08', 'While we were eating, the phone rang.', { alternatives: ['The phone rang while we were eating.'] }),
+    ec('a2-07-l02-e09', 'I was walking home when I was seeing a cat.', ['I was walking home when I saw a cat.'], {
+      explanation: t('The short event (seeing the cat) takes the Past Simple.', 'Qısa hadisə (pişiyi görmək) Past Simple-da olur.'),
+    }),
+    ec('a2-07-l02-e10', 'When the phone rang, I was answering it.', ['When the phone rang, I answered it.'], {
+      explanation: t('Two short actions in sequence: both Past Simple.'),
+    }),
+    st('a2-07-l02-e11', 'I was sleeping. The alarm rang.', t('Join the sentences with "when".', '"when" ilə birləşdirin.'), [
+      'I was sleeping when the alarm rang.',
+      'When the alarm rang, I was sleeping.',
+    ]),
+    st('a2-07-l02-e12', 'They were driving. They saw an accident.', t('Join the sentences with "while".', '"while" ilə birləşdirin.'), [
+      'While they were driving, they saw an accident.',
+      'They saw an accident while they were driving.',
+    ]),
+    qf('a2-07-l02-e13', 'what / you / do / when / I / call / you ?', ['What were you doing when I called you?']),
+    sp('a2-07-l02-e14', t('Tell me what you were doing when your phone last rang.'), 'I was having lunch when my phone rang.', [
+      'I used was / were + -ing for the background',
+      'I used the Past Simple for "rang"',
+      'I used "when"',
+    ]),
+    sp('a2-07-l02-e15', t('Describe two things that were happening at the same time yesterday, using "while".'), 'While I was cooking, my sister was doing her homework.', [
+      'I used "while"',
+      'Both actions are in the Past Continuous',
+    ]),
+  ],
+}
+
+const L03: LessonInput = {
+  id: 'a2-07-l03',
+  title: 'Reading: a strange evening',
+  kind: 'reading',
+  estimatedMinutes: 10,
+  objectives: ['Follow a short story told with Past Continuous and Past Simple', 'Answer questions about background and events'],
+  blocks: [
+    {
+      type: 'passage',
+      title: 'A strange evening',
+      paragraphs: [
+        'It was eight o’clock on Friday evening. I was cooking dinner and my brother was watching a film in the living room. Outside, it was raining hard.',
+        'Suddenly the phone rang. I was looking for a towel when it stopped. Then the lights went out. My brother was shouting from the living room while I was searching for a candle.',
+        'When I finally found the candle, the lights came back on. The phone rang again. It was my mother. “I was calling to say happy birthday,” she said. I had forgotten my own birthday!',
+      ],
+    },
+    {
+      type: 'tip',
+      text: t(
+        'Notice the pattern: long background actions (was cooking, was watching, was raining) and short events (rang, stopped, went out, came back on).',
+        'Nümunəyə diqqət edin: uzun fon hərəkətləri (was cooking, was watching, was raining) və qısa hadisələr (rang, stopped, went out, came back on).',
+      ),
+    },
+  ],
+  exercises: [
+    mc('a2-07-l03-e01', 'I ___ dinner when the phone rang.', ['cooked', 'was cooking', 'am cooking', 'cook'], 1, {
+      explanation: t(
+        'The phone ringing interrupted an action in progress, so the longer background action takes the Past Continuous: was cooking.',
+        'Telefon zəng çalanda yemək bişirmək davam edirdi. Davam edən (fon) hərəkət üçün Past Continuous işlədilir: was cooking.',
+      ),
+    }),
+    mc('a2-07-l03-e02', 'What was the brother doing at eight o’clock?', ['He was cooking.', 'He was watching a film.', 'He was sleeping.', 'He was calling his mother.'], 1),
+    mc('a2-07-l03-e03', 'What happened after the phone stopped ringing?', ['The lights went out.', 'It started to rain.', 'My mother arrived.', 'I found a towel.'], 0),
+    mc('a2-07-l03-e04', 'Why did the mother call?', ['To ask about the lights', 'To say happy birthday', 'To ask for a candle', 'To talk about the film'], 1),
+    fb('a2-07-l03-e05', 'Outside, it ___ (rain) hard.', ['was raining']),
+    fb('a2-07-l03-e06', 'When I finally ___ (find) the candle, the lights ___ (come) back on.', [['found'], ['came']]),
+    match(
+      'a2-07-l03-e07',
+      [
+        ['was cooking', 'background action'],
+        ['rang', 'short event'],
+        ['was shouting', 'background action'],
+        ['went out', 'short event'],
+      ],
+      { prompt: 'Is each verb a background action or a short event?' },
+    ),
+    gw(
+      'a2-07-l03-e08',
+      t('Write three sentences about the story. Use one Past Continuous and one "when".', 'Hekayə haqqında üç cümlə yazın.'),
+      20,
+      [
+        { label: 'Uses was / were + -ing', anyOf: ['was ', 'were '] },
+        { label: 'Uses when or while', anyOf: ['when', 'while'] },
+      ],
+      { modelAnswer: 'The narrator was cooking when the phone rang. The lights went out while the brother was watching a film. In the end, the mother called to say happy birthday.' },
+    ),
+  ],
+}
+
+const L04: LessonInput = {
+  id: 'a2-07-l04',
+  title: 'Speaking: tell a story about an interruption',
+  kind: 'speaking',
+  estimatedMinutes: 10,
+  objectives: ['Narrate a short story with background and events', 'Use when and while naturally while speaking'],
+  blocks: [
+    {
+      type: 'dialogue',
+      title: 'Model story',
+      lines: [
+        { speaker: 'Leyla', text: 'Last Saturday I was walking in the park. The sun was shining and children were playing.' },
+        { speaker: 'Leyla', text: 'Suddenly, a dog ran towards me while I was eating an ice cream. It jumped, and the ice cream fell on the ground!' },
+        { speaker: 'Leyla', text: 'When I looked up, the owner was laughing. She bought me a new one.' },
+      ],
+    },
+  ],
+  exercises: [
+    sp('a2-07-l04-e01', t('Set the scene: say three things that were happening when your story began.'), 'It was Saturday afternoon. I was walking in the park, the sun was shining and children were playing.', [
+      'I used three Past Continuous verbs',
+      'I said when and where',
+    ]),
+    sp('a2-07-l04-e02', t('Say what happened suddenly. Use "when" or "while".'), 'While I was eating an ice cream, a dog ran towards me.', [
+      'I used "when" or "while"',
+      'The short event is in the Past Simple',
+    ]),
+    sp('a2-07-l04-e03', t('Say how the story ended.'), 'When I looked up, the owner was laughing, and she bought me a new ice cream.', [
+      'I used at least one Past Simple verb',
+      'I finished the story',
+    ]),
+    sp('a2-07-l04-e04', t('Now tell the whole story in one go, without stopping, for about one minute.'), 'Last Saturday I was walking in the park... (full story)', [
+      'I spoke for about a minute',
+      'I used both tenses',
+      'I used when or while at least twice',
+    ]),
+  ],
+}
+
+const L05: LessonInput = {
+  id: 'a2-07-l05',
+  title: 'Chapter check',
+  kind: 'assessment',
+  estimatedMinutes: 15,
+  objectives: ['Show you can form the Past Continuous and combine it with the Past Simple'],
+  exercises: [
+    mc('a2-07-l05-e01', 'At midnight they ___ still ___.', ['was / dancing', 'were / dancing', 'were / danced', 'are / dancing'], 1),
+    mc('a2-07-l05-e02', 'I ___ when you called.', ['was sleeping', 'slept', 'sleep', 'am sleeping'], 0),
+    mc('a2-07-l05-e03', '___ we were waiting, the bus arrived.', ['When', 'While', 'Then', 'After'], 1),
+    fb('a2-07-l05-e04', 'She ___ (write) an email when the computer ___ (crash).', [['was writing'], ['crashed']]),
+    fb('a2-07-l05-e05', '___ you ___ (listen) to me?', ['Were', 'listening']),
+    fb('a2-07-l05-e06', 'We ___ (not / expect) visitors, so we ___ (be) surprised.', [["weren't expecting", 'were not expecting'], ['were']]),
+    ord('a2-07-l05-e07', 'He was running when he fell.'),
+    ord('a2-07-l05-e08', 'What were you doing at ten?'),
+    ec('a2-07-l05-e09', 'They was playing cards all evening.', ['They were playing cards all evening.']),
+    ec('a2-07-l05-e10', 'When she was opening the door, she saw a letter.', ['When she opened the door, she saw a letter.']),
+    st('a2-07-l05-e11', 'He was working. The fire alarm rang.', t('Join the sentences with "when".'), [
+      'He was working when the fire alarm rang.',
+      'When the fire alarm rang, he was working.',
+    ]),
+    st('a2-07-l05-e12', 'We were studying.', t('Make it a question.'), ['Were we studying?']),
+    qf('a2-07-l05-e13', 'where / they / go / when / you / see / them ?', ['Where were they going when you saw them?']),
+    match(
+      'a2-07-l05-e14',
+      [
+        ['swim', 'swimming'],
+        ['come', 'coming'],
+        ['die', 'dying'],
+        ['stop', 'stopping'],
+      ],
+      { prompt: 'Match the verb with its -ing form.' },
+    ),
+    gw(
+      'a2-07-l05-e15',
+      t('Write a four-sentence story about an interruption.'),
+      30,
+      [
+        { label: 'Uses the Past Continuous', anyOf: ['was ', 'were '] },
+        { label: 'Uses when or while', anyOf: ['when', 'while'] },
+      ],
+    ),
+  ],
+}
+
+export const A2_07: ChapterInput = {
+  id: 'a2-07',
+  level: 'A2',
+  number: 7,
+  title: 'Past Continuous; when / while; interrupted actions',
+  description: 'Describe what was happening when something else happened.',
+  objectives: ['Form was / were + -ing', 'Combine Past Continuous with Past Simple using when and while', 'Narrate a short story with background and events'],
+  skills: ['grammar', 'reading', 'speaking', 'writing'],
+  version: 1,
+  status: 'authored',
+  completion: { passMark: 80, requireAssessment: true, requireSpeaking: true },
+  lessons: [L01, L02, L03, L04, L05],
+}

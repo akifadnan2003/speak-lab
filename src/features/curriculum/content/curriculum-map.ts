@@ -1,0 +1,201 @@
+import { CurriculumSchema, type Chapter, type ChapterInput, type CefrLevel, type Skill } from '../schema'
+import { A0_01 } from './chapters/a0-01-to-be'
+import { A2_07 } from './chapters/a2-07-past-continuous'
+
+/**
+ * The complete SpeakLab curriculum map, A0 → C1, in prerequisite order.
+ *
+ * Every chapter is listed so the Learn screen shows the real path. Chapters
+ * with `status: 'planned'` have objectives but no lessons yet; the UI says so
+ * and never links into them. Authored chapters live in `./chapters/` and are
+ * spliced in by id.
+ *
+ * Sequencing source: docs/CURRICULUM.md §3 (updated for M3: A0 chapter 1 is
+ * sentence structure + subject pronouns + am/is/are; the alphabet and
+ * greetings are lessons inside it).
+ */
+
+interface Planned {
+  title: string
+  description: string
+  objectives: string[]
+  skills: Skill[]
+  /** Extra prerequisites beyond the previous chapter. */
+  also?: string[]
+}
+
+const G: Skill[] = ['grammar', 'speaking']
+const GV: Skill[] = ['grammar', 'vocabulary', 'speaking']
+const V: Skill[] = ['vocabulary', 'speaking']
+
+const LEVEL_PLANS: Record<CefrLevel, Planned[]> = {
+  A0: [
+    {
+      title: 'Sentence structure, subject pronouns and am / is / are',
+      description: 'Build your first English sentences, introduce yourself and ask simple questions.',
+      objectives: [],
+      skills: [],
+    },
+    {
+      title: 'a / an, singular nouns and this / that',
+      description: 'Name the things around you and point to them.',
+      objectives: ['Use a and an before singular nouns', 'Point to near and far things with this and that', 'Ask "What is this?" and answer'],
+      skills: GV,
+    },
+    {
+      title: 'Plurals, these / those, numbers and prices',
+      description: 'Count, talk about more than one thing and understand prices.',
+      objectives: ['Form regular and common irregular plurals', 'Use these and those', 'Say and understand numbers 1–100 and prices'],
+      skills: GV,
+    },
+    {
+      title: 'Adjectives: describing people and things',
+      description: 'Add colour, size and nationality to your sentences.',
+      objectives: ['Put adjectives before nouns and after be', 'Use colours, sizes and nationalities', 'Describe a person in three sentences'],
+      skills: GV,
+    },
+    {
+      title: "Possessive adjectives and 's; family",
+      description: 'Talk about your family and what belongs to whom.',
+      objectives: ['Use my, your, his, her, its, our, their', "Use 's for possession", 'Introduce your family'],
+      skills: GV,
+    },
+    {
+      title: 'There is / there are; prepositions of place; home',
+      description: 'Describe rooms, say where things are and ask about places.',
+      objectives: ['Use there is / there are in statements and questions', 'Use in, on, under, next to, between', 'Describe your home'],
+      skills: GV,
+    },
+    {
+      title: 'Wh- questions: what, where, who, how old; personal information',
+      description: 'Ask for and give personal information in a short conversation.',
+      objectives: ['Form what / where / who / how old questions with be', 'Give personal information', 'Fill in a simple form by speaking'],
+      skills: G,
+    },
+    {
+      title: 'A0 review, survival dialogues and checkpoint',
+      description: 'Café, shop and directions dialogues; checkpoint for A1.',
+      objectives: ['Order in a café and buy something in a shop', 'Ask for and understand simple directions', 'Pass the A0 checkpoint (80%)'],
+      skills: ['grammar', 'vocabulary', 'speaking', 'listening'],
+    },
+  ],
+  A1: [
+    { title: 'Present Simple: routines and frequency adverbs', description: 'Talk about habits, routines and facts.', objectives: ['Use Present Simple with I / you / we / they and he / she / it (-s)', 'Make negatives and questions with do / does', 'Use always, usually, often, sometimes, never'], skills: G },
+    { title: 'Have / has got; possessions; describing people', description: 'Say what you have and describe appearance.', objectives: ['Use have got / has got in all forms', 'Describe hair, eyes, height', 'Ask "Have you got…?"'], skills: GV },
+    { title: 'Can / can’t: ability, permission and polite requests', description: 'Say what you can do and ask politely.', objectives: ['Use can / can’t for ability', 'Ask for permission with Can I…?', 'Make polite requests: Can you…?'], skills: G },
+    { title: 'Present Continuous: now vs usually; clothes and weather', description: 'Describe what is happening now and contrast it with routines.', objectives: ['Form be + -ing', 'Contrast Present Continuous with Present Simple', 'Describe clothes and weather'], skills: GV },
+    { title: 'Countable / uncountable; some, any, much, many, a lot of; food', description: 'Talk about food and quantities.', objectives: ['Distinguish countable and uncountable nouns', 'Use some / any in statements and questions', 'Use much / many / a lot of'], skills: GV },
+    { title: 'Prepositions of time; telling the time; appointments', description: 'Make and change appointments.', objectives: ['Use in / on / at with times, days and months', 'Tell the time', 'Arrange to meet someone'], skills: GV },
+    { title: 'Object pronouns; like / love / hate + -ing; free time', description: 'Talk about what you enjoy.', objectives: ['Use me, you, him, her, it, us, them', 'Use like / love / hate + -ing', 'Talk about hobbies and weekends'], skills: GV },
+    { title: 'Was / were; Past Simple of be; yesterday', description: 'Your first steps into the past.', objectives: ['Use was / were in statements, negatives and questions', 'Use time expressions: yesterday, last week, ago', 'Describe where you were yesterday'], skills: G },
+    { title: 'Imperatives and should; health', description: 'Give instructions and simple advice.', objectives: ['Use imperatives for instructions', 'Give advice with should / shouldn’t', 'Talk about health problems'], skills: GV },
+    { title: 'A1 assessment: a day in your life', description: 'Spoken monologue of 60 seconds plus a written check.', objectives: ['Describe a typical day for one minute', 'Pass the A1 checkpoint (80%)'], skills: ['grammar', 'speaking', 'writing'] },
+  ],
+  A2: [
+    { title: 'Past Simple: regular verbs and time expressions', description: 'Talk about finished events.', objectives: ['Form regular past verbs with -ed', 'Pronounce -ed endings (/t/, /d/, /ɪd/)', 'Use last, ago, in 2015'], skills: ['grammar', 'pronunciation', 'speaking'] },
+    { title: 'Past Simple: 50 irregular verbs; narrative sequencing', description: 'The verbs you need to tell any story.', objectives: ['Use the 50 most frequent irregular verbs', 'Sequence a story with first, then, after that, finally', 'Retell a short story'], skills: GV },
+    { title: 'Past Simple: questions and negatives; biographies', description: 'Ask about the past and talk about people’s lives.', objectives: ['Form did questions and didn’t negatives', 'Ask about someone’s past', 'Tell a short biography'], skills: G },
+    { title: 'Comparatives and superlatives; opinions about places', description: 'Compare people, places and things.', objectives: ['Form -er / more and -est / most', 'Use than and as…as', 'Give opinions about places'], skills: GV },
+    { title: 'Going to and will: plans vs predictions', description: 'Talk about the future for the first time.', objectives: ['Use going to for plans', 'Use will for predictions and decisions', 'Choose between them'], skills: G },
+    { title: 'Past Simple consolidation and storytelling', description: 'Tell a complete story in the past.', objectives: ['Combine regular and irregular verbs fluently', 'Use time connectors', 'Tell a two-minute story'], skills: ['grammar', 'speaking', 'writing'] },
+    { title: 'Past Continuous; when / while; interrupted actions', description: 'Describe what was happening when something else happened.', objectives: ['Form was / were + -ing', 'Combine Past Continuous with Past Simple', 'Narrate background and events'], skills: G },
+    { title: 'Future forms: will, going to, Present Continuous for arrangements', description: 'Predictions, plans and fixed arrangements.', objectives: ['Use Present Continuous for arrangements', 'Choose between the three future forms', 'Talk about next week'], skills: G },
+    { title: 'Modals: can, could, should, must, have to', description: 'Rules, advice and obligation.', objectives: ['Give advice with should', 'Express obligation with must and have to', 'Make polite requests with could'], skills: G },
+    { title: 'Gerunds and infinitives after common verbs; preferences', description: 'Say what you want, enjoy and plan to do.', objectives: ['Use verb + -ing (enjoy, finish, mind)', 'Use verb + to (want, decide, hope)', 'Talk about preferences'], skills: GV },
+    { title: 'Conjunctions and adverbs of manner; connected storytelling', description: 'Join ideas and say how things happen.', objectives: ['Use because, so, but, although', 'Form and position adverbs of manner', 'Link a story together'], skills: ['grammar', 'speaking', 'writing'] },
+    { title: 'A2 assessment: tell a two-minute story', description: 'Background, events and feelings.', objectives: ['Tell a story with background and events for two minutes', 'Pass the A2 checkpoint (80%)'], skills: ['grammar', 'speaking', 'writing'] },
+  ],
+  B1: [
+    { title: 'Present Perfect: experiences; ever / never', description: 'Talk about life experiences.', objectives: ['Form have / has + past participle', 'Ask Have you ever…?', 'Talk about experiences without saying when'], skills: G },
+    { title: 'Present Perfect with since / for / yet / already / just', description: 'Connect the past to now.', objectives: ['Use since and for', 'Use yet, already and just', 'Describe how long you have done things'], skills: G },
+    { title: 'Present Perfect vs Past Simple', description: 'The most common B1 confusion, resolved.', objectives: ['Choose the tense from the time reference', 'Move from general experience to specific detail', 'Interview someone about their life'], skills: G },
+    { title: 'Present Perfect Continuous', description: 'Emphasise duration and recent activity.', objectives: ['Form have been + -ing', 'Contrast with Present Perfect Simple', 'Explain why you are tired, wet, happy'], skills: G },
+    { title: 'First conditional; when / unless / as soon as', description: 'Real possibilities and their results.', objectives: ['Form if + present, will', 'Use unless, as soon as, when', 'Make plans with conditions'], skills: G },
+    { title: 'Second conditional; hypothetical advice', description: 'Imagine and advise.', objectives: ['Form if + past, would', 'Say If I were you…', 'Discuss hypothetical situations'], skills: G },
+    { title: 'Passive voice (present and past)', description: 'Focus on the action, not the agent.', objectives: ['Form be + past participle', 'Use by when the agent matters', 'Describe processes and news'], skills: ['grammar', 'reading', 'speaking'] },
+    { title: 'Defining relative clauses', description: 'Describe people, places and things precisely.', objectives: ['Use who, which, that, where', 'Leave out the pronoun when it is the object', 'Define words you do not know'], skills: GV },
+    { title: 'Reported speech: statements', description: 'Tell people what others said.', objectives: ['Shift tenses back', 'Change pronouns and time expressions', 'Report a conversation'], skills: G },
+    { title: 'Reported speech: questions and requests', description: 'Report questions, orders and requests.', objectives: ['Report yes/no and wh- questions', 'Use asked / told + to', 'Retell an interview'], skills: G },
+    { title: 'Phrasal verbs I: daily life (40 items)', description: 'Separable and inseparable phrasal verbs.', objectives: ['Use 40 everyday phrasal verbs', 'Separate when the object is a pronoun', 'Talk about your routine naturally'], skills: V },
+    { title: 'Used to / would; past habits', description: 'Describe how life was different.', objectives: ['Use used to for past states and habits', 'Use would for repeated past actions', 'Compare then and now'], skills: G },
+    { title: 'Quantifiers and articles revisited; generalisations', description: 'Precision with articles and amounts.', objectives: ['Use the, a, zero article correctly', 'Use few / a few / little / a little', 'Make generalisations'], skills: G },
+    { title: 'B1 assessment: opinion discussion and short email', description: 'Discuss and write.', objectives: ['Hold a five-minute opinion discussion', 'Write a 120-word email', 'Pass the B1 checkpoint (80%)'], skills: ['grammar', 'speaking', 'writing'] },
+  ],
+  B2: [
+    { title: 'Past Perfect and Past Perfect Continuous; narrative tenses together', description: 'Order events in the past precisely.', objectives: ['Form had + past participle / had been + -ing', 'Combine four narrative tenses', 'Tell an anecdote with flashbacks'], skills: G },
+    { title: 'Future Continuous and Future Perfect', description: 'Describe the future in progress and completed.', objectives: ['Form will be + -ing and will have + past participle', 'Use by and by the time', 'Talk about life in ten years'], skills: G },
+    { title: 'Third and mixed conditionals; regret and criticism', description: 'Talk about the unreal past.', objectives: ['Form if + past perfect, would have', 'Mix time references', 'Express regret and criticism politely'], skills: G },
+    { title: 'Modals of deduction (present and past)', description: 'Reason about what must, might or can’t be true.', objectives: ['Use must / might / can’t + be', 'Use must have / might have / can’t have', 'Speculate about situations'], skills: G },
+    { title: 'Passive with modals and reporting verbs', description: 'Formal and journalistic passives.', objectives: ['Use modal passives', 'Use is said to / is thought to', 'Summarise news items'], skills: ['grammar', 'reading', 'speaking'] },
+    { title: 'Non-defining relative clauses; reduced relatives', description: 'Add information elegantly.', objectives: ['Punctuate non-defining clauses', 'Reduce clauses with -ing / -ed', 'Describe people and places in detail'], skills: ['grammar', 'writing', 'speaking'] },
+    { title: 'Inversion for emphasis', description: 'Not only…, Rarely…, Never have I…', objectives: ['Invert after negative adverbials', 'Use inversion in speech for emphasis', 'Recognise inversion in reading'], skills: ['grammar', 'reading', 'speaking'] },
+    { title: 'Advanced linking and cohesion; discourse structure', description: 'Structure longer speech and writing.', objectives: ['Use however, whereas, in contrast, consequently', 'Organise an argument', 'Give a two-minute structured answer'], skills: ['grammar', 'writing', 'speaking'] },
+    { title: 'Collocations and dependent prepositions', description: 'Sound natural, not translated.', objectives: ['Use 60 high-frequency collocations', 'Use dependent prepositions (depend on, interested in)', 'Self-correct translated phrases'], skills: V },
+    { title: 'Idioms and fixed expressions in conversation', description: 'Understand and use natural expressions.', objectives: ['Understand 40 common idioms', 'Use 15 of them appropriately', 'Recognise register'], skills: ['vocabulary', 'listening', 'speaking'] },
+    { title: 'Phrasal verbs II: work and relationships (60 items)', description: 'Phrasal verbs for professional and personal life.', objectives: ['Use 60 phrasal verbs', 'Distinguish literal and idiomatic meanings', 'Talk about work and relationships'], skills: V },
+    { title: 'Professional communication: meetings, emails, presentations', description: 'English for work.', objectives: ['Run and take part in a meeting', 'Write a formal email', 'Give a five-minute presentation'], skills: ['speaking', 'writing', 'listening'] },
+    { title: 'Debate techniques: argument, concession, rebuttal', description: 'Argue a point and respond to others.', objectives: ['Build an argument', 'Concede and rebut', 'Take part in a structured debate'], skills: ['speaking', 'listening'] },
+    { title: 'B2 assessment: structured debate and formal letter', description: 'Argue and write formally.', objectives: ['Debate for ten minutes', 'Write a 200-word formal letter', 'Pass the B2 checkpoint (80%)'], skills: ['grammar', 'speaking', 'writing'] },
+  ],
+  C1: [
+    { title: 'Nuance in tense and aspect', description: 'Subtle meaning shifts between forms.', objectives: ['Choose aspect for attitude and emphasis', 'Use Future Perfect Continuous receptively', 'Explain tense choices'], skills: ['grammar', 'reading', 'speaking'] },
+    { title: 'Discourse markers and hedging in natural speech', description: 'Sound measured and natural.', objectives: ['Use I suppose, to be honest, sort of, arguably', 'Hedge claims appropriately', 'Manage a conversation'], skills: ['speaking', 'listening'] },
+    { title: 'Advanced syntax: cleft sentences, fronting, ellipsis', description: 'Shape sentences for emphasis.', objectives: ['Use what-clefts and it-clefts', 'Front elements for emphasis', 'Use ellipsis in speech'], skills: ['grammar', 'speaking', 'writing'] },
+    { title: 'Subjunctive and formal structures', description: 'Formal English with precision.', objectives: ['Use the subjunctive after suggest, insist, demand', 'Use formal conditionals (Should you…, Were it…)', 'Write formally'], skills: ['grammar', 'writing'] },
+    { title: 'Argumentation and persuasive language', description: 'Convince an audience.', objectives: ['Structure a persuasive argument', 'Use rhetorical devices', 'Anticipate counter-arguments'], skills: ['speaking', 'writing'] },
+    { title: 'Presentation skills and signposting', description: 'Present confidently.', objectives: ['Signpost a presentation', 'Handle questions', 'Deliver a ten-minute talk'], skills: ['speaking'] },
+    { title: 'Real-world listening: accents, speed and implicit meaning', description: 'Understand authentic speech.', objectives: ['Follow fast speech and varied accents', 'Infer implied meaning', 'Summarise a podcast segment'], skills: ['listening', 'speaking'] },
+    { title: 'Register: formal, neutral, informal; tone', description: 'Choose the right level of language.', objectives: ['Shift register on demand', 'Recognise tone in writing', 'Rewrite a text for a different audience'], skills: ['writing', 'speaking', 'reading'] },
+    { title: 'Academic and professional writing', description: 'Write reports and essays.', objectives: ['Structure an essay or report', 'Use cohesive devices', 'Cite and paraphrase'], skills: ['writing', 'reading'] },
+    { title: 'Contextual vocabulary: precision, connotation, word families', description: 'The right word, not just a word.', objectives: ['Distinguish near-synonyms', 'Use word families productively', 'Recognise connotation'], skills: ['vocabulary', 'reading', 'writing'] },
+    { title: 'Extended fluency: monologues and interviews', description: 'Speak at length under pressure.', objectives: ['Hold a five-minute monologue', 'Handle an interview', 'Self-monitor accuracy'], skills: ['speaking', 'listening'] },
+    { title: 'C1 final assessment: presentation, interview and essay', description: 'Demonstrate advanced competence.', objectives: ['Deliver a presentation', 'Complete a formal interview', 'Write a 300-word essay'], skills: ['grammar', 'speaking', 'writing', 'listening'] },
+  ],
+}
+
+/** Authored chapters, spliced into the map by id. Everything else is `planned`. */
+const AUTHORED: Record<string, ChapterInput> = { [A0_01.id]: A0_01, [A2_07.id]: A2_07 }
+
+export function chapterIdFor(level: CefrLevel, number: number): string {
+  return `${level.toLowerCase()}-${String(number).padStart(2, '0')}`
+}
+
+function buildMap(): ChapterInput[] {
+  const chapters: ChapterInput[] = []
+  let previous: string | undefined
+  for (const level of ['A0', 'A1', 'A2', 'B1', 'B2', 'C1'] as const) {
+    LEVEL_PLANS[level].forEach((plan, i) => {
+      const id = chapterIdFor(level, i + 1)
+      const authored = AUTHORED[id]
+      if (authored) {
+        chapters.push({ ...authored, prerequisites: authored.prerequisites ?? (previous ? [previous] : []) })
+      } else {
+        chapters.push({
+          id,
+          level,
+          number: i + 1,
+          title: plan.title,
+          description: plan.description,
+          objectives: plan.objectives,
+          skills: plan.skills,
+          prerequisites: [...(previous ? [previous] : []), ...(plan.also ?? [])],
+          status: 'planned',
+        })
+      }
+      previous = id
+    })
+  }
+  return chapters
+}
+
+/** Validated at module load; a content mistake fails typecheck-time tests, never a learner's screen. */
+export const CURRICULUM: readonly Chapter[] = CurriculumSchema.parse(buildMap())
+
+export const CHAPTERS_PER_LEVEL: Record<CefrLevel, number> = {
+  A0: LEVEL_PLANS.A0.length,
+  A1: LEVEL_PLANS.A1.length,
+  A2: LEVEL_PLANS.A2.length,
+  B1: LEVEL_PLANS.B1.length,
+  B2: LEVEL_PLANS.B2.length,
+  C1: LEVEL_PLANS.C1.length,
+}
