@@ -324,8 +324,7 @@ test('vocabulary answers follow the account, queue offline with a visible warnin
       return set.call(this, k, v)
     }
     proto.removeItem = function (k: string) {
-      console.log(`storage remove ${k} ${new Error().stack?.split('
-').slice(1, 4).join(' | ')}`)
+      console.log(`storage remove ${k} ${new Error().stack?.split('\n').slice(1, 4).join(' | ')}`)
       return remove.call(this, k)
     }
     window.addEventListener('unhandledrejection', (e) => console.log(`unhandledrejection ${String((e.reason as Error)?.message ?? e.reason)}`))
