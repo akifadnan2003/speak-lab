@@ -5,7 +5,7 @@ import { DemoNotice } from '@/components/feedback/DemoNotice'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -24,8 +24,13 @@ import { useAuth } from '@/features/auth/AuthProvider'
 import { formatRelative } from '@/lib/utils'
 import { ACCOUNT_STATUS_LABEL, StudentAdminError, useStudent, useStudentAdmin, useStudentEvents, type AccountEvent, type StudentAccount } from './api'
 import { DemoStudentSections } from './DemoStudentSections'
+import { StudentAssignmentsSection } from './StudentAssignmentsSection'
 import { StudentCurriculumSection } from './StudentCurriculumSection'
+import { StudentNotesSection } from './StudentNotesSection'
+import { StudentOverviewSection } from './StudentOverviewSection'
 import { StudentProgressSection } from './StudentProgressSection'
+import { StudentSettingsSection } from './StudentSettingsSection'
+import { StudentVocabularySection } from './StudentVocabularySection'
 
 const SECTIONS = [
   'overview',
@@ -55,13 +60,9 @@ const SECTION_LABEL: Record<Section, string> = {
 }
 
 /** Which milestone delivers each placeholder section (kept honest in the UI). */
-const SECTION_MILESTONE: Record<Exclude<Section, 'overview' | 'history' | 'curriculum' | 'progress'>, string> = {
-  vocabulary: 'M4 · Vocabulary and revision',
+const SECTION_MILESTONE: Record<Extract<Section, 'speaking' | 'listening'>, string> = {
   speaking: 'M7 · AI speaking',
   listening: 'M8 · Advanced learning',
-  assignments: 'M6 · Tutor dashboard',
-  notes: 'M6 · Tutor dashboard',
-  settings: 'M6 · Tutor dashboard',
 }
 
 const EVENT_LABEL: Record<AccountEvent['type'], string> = {
@@ -78,6 +79,11 @@ const EVENT_LABEL: Record<AccountEvent['type'], string> = {
   chapter_override_cleared: 'Chapter override removed',
   assessment_submitted: 'Chapter check submitted',
   assessment_reset: 'Chapter check retake allowed',
+  assignment_published: 'Homework assigned',
+  assignment_cancelled: 'Homework cancelled',
+  assignment_submitted: 'Homework submitted',
+  assignment_returned: 'Homework returned for changes',
+  assignment_reviewed: 'Homework reviewed',
 }
 
 function isSection(value: string | undefined): value is Section {
@@ -166,7 +172,19 @@ export function StudentDetailPage() {
         ) : (
           <>
             <TabsContent value="overview">
-              <AccountOverview account={account} />
+              <StudentOverviewSection account={account} />
+            </TabsContent>
+            <TabsContent value="assignments">
+              <StudentAssignmentsSection account={account} tutorId={tutorId} />
+            </TabsContent>
+            <TabsContent value="vocabulary">
+              <StudentVocabularySection studentId={account.id} />
+            </TabsContent>
+            <TabsContent value="notes">
+              <StudentNotesSection studentId={account.id} tutorId={tutorId} />
+            </TabsContent>
+            <TabsContent value="settings">
+              <StudentSettingsSection account={account} tutorId={tutorId} />
             </TabsContent>
             <TabsContent value="curriculum">
               <StudentCurriculumSection studentId={account.id} tutorId={tutorId} />
@@ -188,43 +206,6 @@ export function StudentDetailPage() {
           </>
         )}
       </Tabs>
-    </div>
-  )
-}
-
-function AccountOverview({ account }: { account: StudentAccount }) {
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>Account</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-            <dt className="text-fg-muted">Email</dt>
-            <dd className="break-all">{account.email}</dd>
-            <dt className="text-fg-muted">Status</dt>
-            <dd>{ACCOUNT_STATUS_LABEL[account.status]}</dd>
-            <dt className="text-fg-muted">Onboarding</dt>
-            <dd>{account.onboardingCompletedAt ? `Completed ${formatRelative(account.onboardingCompletedAt)}` : 'Not completed yet'}</dd>
-            <dt className="text-fg-muted">Support language</dt>
-            <dd>{account.supportLanguage === 'az' ? 'Azerbaijani' : 'None'}</dd>
-            <dt className="text-fg-muted">Linked</dt>
-            <dd>{new Date(account.linkedAt).toLocaleString()}</dd>
-          </dl>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Learning summary</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <DemoNotice>
-            Level, progress, speaking minutes and homework appear here from M3–M6. No figures are shown until they are
-            real.
-          </DemoNotice>
-        </CardContent>
-      </Card>
     </div>
   )
 }

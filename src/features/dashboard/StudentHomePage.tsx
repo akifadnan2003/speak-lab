@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useCurrentUser } from '@/features/auth/AuthProvider'
 import { currentChapter, nextLesson } from '@/features/curriculum/progression'
 import { LESSON_KIND_LABEL, LEVEL_NAMES } from '@/features/curriculum/schema'
+import { HomeworkCard } from '@/features/homework/HomeworkCard'
 import { AchievementsCard } from '@/features/progress/AchievementsCard'
 import { WeakTopicsCard } from '@/features/progress/PracticeCards'
 import { TimelineCard } from '@/features/progress/TimelineCard'
@@ -170,6 +171,7 @@ export function StudentHomePage() {
               <TimelineCard events={analytics.timeline} limit={5} title="Recent activity" />
             </div>
             <div className="flex flex-col gap-6">
+              {user ? <HomeworkCard studentId={user.id} /> : null}
               <WeakTopicsCard insights={analytics.insights} compact />
               <AchievementsCard achievements={analytics.achievements} compact />
             </div>
