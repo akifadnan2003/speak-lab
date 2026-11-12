@@ -161,7 +161,7 @@ evidence in `docs/VOCABULARY_PERSISTENCE.md`, ADR-018, ADR-019):
 - [x] Cleanup wired to M2: `speaklab.vocab.*` keys purged, repository caches and timers disposed on
       sign-out and account switch
 - [x] Vocabulary results never reach assessments (`assessment-isolation.test.ts`)
-- [x] Tests: 305 unit (PGlite scheduler parity, outbox, cloud repository, import, cleanup, badge,
+- [x] Tests: 306 unit (PGlite scheduler parity, outbox, cloud repository, import, cleanup, badge,
       sign-out guard), 22 PGlite RLS tests, 7 full-stack RLS tests, real-auth browser scenario
       (online answer, offline queue + warning, guarded sign-out, device 2 restore)
 

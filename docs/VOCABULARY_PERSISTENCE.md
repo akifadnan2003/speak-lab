@@ -120,7 +120,9 @@ Applied identically to live practice, offline queues, a second device and the lo
 - `wire.ts`: row ↔ state mapping (instants normalised to UTC) and the review payload (no quality,
   interval or stage; flashcard self-grade derived from the recorded quality).
 - `VocabularyProvider` picks this repository when `getSupabaseClient()` is non-null; otherwise the
-  M4 device repository (preview mode, tests).
+  M4 device repository (preview mode, tests). Its record queries and the save mutation run with
+  TanStack `networkMode: 'always'`: the default pauses them while `navigator.onLine` is false,
+  which would keep an offline answer out of the durable queue (found by the browser scenario).
 
 ## 6. Local-to-cloud migration (Task 5)
 

@@ -82,8 +82,8 @@ CI); bump it on purpose with a green `database` job, not through `latest`.
 | Server-owned schedule | `pglite/vocabulary-rls.test.ts` (direct writes refused even on own rows, quality/interval/stage derived server-side); `scheduler.sql-parity.test.ts` (TS scheduler ≡ SQL scheduler over 40 sequences, mastery, lapses, DST); `cloud.test.ts` "never sends client-computed quality" |
 | Idempotency and ordering | `pglite/vocabulary-rls.test.ts` (duplicate id, older-than-state, before-reset, clock sanity); `vocabulary-rls.test.ts` (same id concurrently from two sessions applied once); `cloud.test.ts` |
 | Offline queue, retry, cross-device restore | `cloud.test.ts`, `outbox.test.ts` (durable queue, reload, backoff, fallback to last server copy, account-switch race); `auth.spec.ts` (offline answer queued, synced, visible on device 2) |
-| Pending-sync indicator | `PendingSyncBadge.test.tsx`, `cloud.test.ts` "queue notifications"; `auth.spec.ts` badge count while offline |
-| Guarded sign-out | `SignOutGuard.test.tsx` (direct sign-out when empty, warn, sync then sign out, failed flush → retry/discard, no user); `local-data.test.ts` pending-work registry; `auth.spec.ts` stay → sync and sign out |
+| Pending-sync indicator | `PendingSyncBadge.test.tsx`, `cloud.test.ts` "queue notifications", `VocabularyProvider.offline.test.tsx` (TanStack network mode); `auth.spec.ts` badge count while offline |
+| Guarded sign-out | `SignOutGuard.test.tsx` (direct sign-out when empty, warn, sync then sign out, failed flush → retry/discard, no user); `local-data.test.ts` pending-work registry; `auth.spec.ts` stay, failed sync offline, Try again online |
 | Cleanup on sign-out / account switch | `cleanup.test.ts` (through M2's real `clearLocalStudentData()` and `activateLocalUser()`); `auth.spec.ts` no `speaklab.vocab*` keys after sign-out |
 | Consented local-to-cloud import | `cloud-import.test.ts`, `LocalImportCard.test.tsx` (plan first, upload only on consent, preview and foreign records refused) |
 | Bank mirror in sync | `bank-seed.test.ts` (generated seed migration equals `bank.ts`) |
@@ -157,9 +157,10 @@ End-to-end (36 tests across two projects):
 Shell e2e (32 tests, two projects): unchanged from M1 (manifest, deep links, navigation,
 exercise keyboard use, role isolation, dialogs, theme, overflow at 7 widths).
 
-Unit / integration added by the M4 integration (total 305): `persistence/api`, `outbox`, `cloud`,
+Unit / integration added by the M4 integration (total 306): `persistence/api`, `outbox`, `cloud`,
 `wire`, `cleanup`, `cloud-import`, `LocalImportCard`, `PendingSyncBadge`, `scheduler.sql-parity`
-(PGlite), `bank-seed`, `assessment-isolation`, `auth/SignOutGuard`, `lib/local-data` pending work.
+(PGlite), `bank-seed`, `assessment-isolation`, `auth/SignOutGuard`, `lib/local-data` pending work,
+`VocabularyProvider.offline` (saving runs while `navigator.onLine` is false).
 
 Database + real-auth (CI `database` job): 21 + 10 + 7 integration tests against the local stack
 (`auth-rls.test.ts`, `progress.test.ts`, `vocabulary-rls.test.ts`), 22 PGlite tests
