@@ -331,10 +331,18 @@ test('vocabulary answers follow the account, queue offline with a visible warnin
   await expect(student.getByTestId('sign-out-guard')).toHaveCount(0)
   await expect(student.getByRole('heading', { name: 'Flashcards' })).toBeVisible()
 
-  // Back online: the explicit sync from the sign-out dialog sends the answer, then signs out.
-  await device1.setOffline(false)
+  // "Sync and sign out" while still offline cannot send anything: the dialog says so and keeps
+  // the session instead of discarding the answer.
   await student.getByTestId('user-menu').click()
   await student.getByRole('menuitem', { name: 'Sign out' }).click()
+  await student.getByTestId('sign-out-sync').click()
+  await expect(student.getByTestId('sign-out-guard')).toHaveAttribute('data-phase', 'failed', { timeout: 30_000 })
+  await expect(student.getByTestId('sign-out-guard')).toContainText('1 could not be sent')
+  await expect(student).not.toHaveURL(/#\/login$/)
+
+  // Back online, "Try again" sends the answer and signs out. (The repository also flushes on the
+  // browser's own `online` event; either way nothing is left to send and sign-out completes.)
+  await device1.setOffline(false)
   await student.getByTestId('sign-out-sync').click()
   await expect(student).toHaveURL(/#\/login$/, { timeout: 30_000 })
   expect((await admin.from('vocabulary_reviews').select('id').eq('student_id', studentId)).data).toHaveLength(2)
