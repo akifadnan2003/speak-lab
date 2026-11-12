@@ -108,8 +108,11 @@ export function useVocabularyBank() {
 export function useVocabularyRecords(studentId: string | null) {
   const { repository } = useVocabularyServices()
   const id = studentId ?? ''
-  const states = useQuery({ queryKey: vocabularyKeys.states(id), queryFn: () => repository.listStates(id), enabled: id.length > 0 })
-  const reviews = useQuery({ queryKey: vocabularyKeys.reviews(id), queryFn: () => repository.listReviews(id), enabled: id.length > 0 })
+  // `networkMode: 'always'`: TanStack pauses queries while `navigator.onLine` is false, but the
+  // cloud repository answers offline from its last server copy plus the queue, and the device
+  // repository never needs the network.
+  const states = useQuery({ queryKey: vocabularyKeys.states(id), queryFn: () => repository.listStates(id), enabled: id.length > 0, networkMode: 'always' })
+  const reviews = useQuery({ queryKey: vocabularyKeys.reviews(id), queryFn: () => repository.listReviews(id), enabled: id.length > 0, networkMode: 'always' })
   return {
     states: states.data,
     reviews: reviews.data,
@@ -133,6 +136,9 @@ export function useVocabularyMutations(studentId: string) {
     onSuccess: invalidate,
     // `mutate()` swallows rejections; a lost answer must at least be visible in the console.
     onError: (error) => console.error('[speaklab] vocabulary answer was not saved', error),
+    // Offline answers must reach the repository's durable queue now, not when TanStack decides
+    // the browser is back online (its default pauses mutations while `navigator.onLine` is false).
+    networkMode: 'always',
   })
   const reset = useMutation({ mutationFn: () => repository.clear(studentId), onSuccess: invalidate })
   return { saveReview, reset }
