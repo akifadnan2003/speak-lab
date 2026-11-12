@@ -5,12 +5,14 @@ describe('navigation config', () => {
   it('gives students the learning sections and tutors the teaching sections', () => {
     expect(navFor('student')).toBe(STUDENT_NAV)
     expect(navFor('tutor')).toBe(TUTOR_NAV)
-    expect(STUDENT_NAV.map((i) => i.to)).toEqual(['/', '/learn', '/speak', '/vocabulary', '/progress'])
+    expect(STUDENT_NAV.map((i) => i.to)).toEqual(['/', '/learn', '/homework', '/speak', '/vocabulary', '/progress'])
     expect(TUTOR_NAV[0]?.to).toBe('/tutor')
   })
 
   it('never puts more than five items in the mobile bottom bar', () => {
     expect(bottomNavFor('student').length).toBeLessThanOrEqual(5)
+    // Homework is reached from the home card and the drawer; the bottom bar keeps the five core sections.
+    expect(bottomNavFor('student').map((i) => i.to)).toEqual(['/', '/learn', '/speak', '/vocabulary', '/progress'])
     expect(bottomNavFor('tutor').length).toBeLessThanOrEqual(5)
   })
 

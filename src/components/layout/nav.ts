@@ -1,6 +1,7 @@
 import {
   BarChart3,
   BookOpen,
+  ClipboardList,
   Home,
   Layers,
   Mic,
@@ -23,6 +24,7 @@ export interface NavItem {
 export const STUDENT_NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: Home, end: true },
   { to: '/learn', label: 'Learn', icon: BookOpen },
+  { to: '/homework', label: 'Homework', icon: ClipboardList },
   { to: '/speak', label: 'Speak', icon: Mic },
   { to: '/vocabulary', label: 'Vocabulary', shortLabel: 'Vocab', icon: Layers },
   { to: '/progress', label: 'Progress', icon: BarChart3 },
@@ -39,8 +41,11 @@ export function navFor(role: UserRole): NavItem[] {
   return role === 'tutor' ? TUTOR_NAV : STUDENT_NAV
 }
 
-/** Items shown in the mobile bottom bar (max five for comfortable touch targets). */
+/**
+ * Items shown in the mobile bottom bar (max five for comfortable touch targets). Homework is
+ * reached from the home page card and the drawer menu on phones.
+ */
 export function bottomNavFor(role: UserRole): NavItem[] {
   const items = navFor(role)
-  return role === 'tutor' ? [...items, SETTINGS_NAV] : items.slice(0, 5)
+  return role === 'tutor' ? [...items, SETTINGS_NAV] : items.filter((i) => i.to !== '/homework').slice(0, 5)
 }

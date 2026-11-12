@@ -68,6 +68,11 @@ Never claim a check passed without running it. Never delete a meaningful test to
   Exercise grading and progression rules are pure functions in `src/features/exercises/engine/` and
   `src/features/curriculum/progression.ts`; screens talk to persistence only through
   `src/features/curriculum/ports.ts`.
+- Homework, submissions, feedback and teacher notes (M6) are governed by the database: triggers
+  own every status transition and timestamp, `complete_assignment` is the only way to complete
+  lesson/vocabulary homework (it verifies the learner's records), and `teacher_notes` has no
+  student-facing policy. Never add client-side status writes or a student path to notes. Rules:
+  `docs/ASSIGNMENTS.md`.
 - Progress analytics are pure functions in `src/features/progress/analytics/` over
   `LearningRecords`; every metric is defined in `docs/PROGRESS_METRICS.md`. No metric may be shown
   without the evidence that definition requires ("Not assessed yet" is the honest state).

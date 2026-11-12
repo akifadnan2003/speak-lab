@@ -40,6 +40,10 @@ const VocabularyPracticePage = lazy(() =>
   import('@/features/vocabulary/VocabularyPracticePage').then((m) => ({ default: m.VocabularyPracticePage })),
 )
 const ProgressPage = lazy(() => import('@/features/progress/ProgressPage').then((m) => ({ default: m.ProgressPage })))
+const HomeworkPage = lazy(() => import('@/features/homework/HomeworkPage').then((m) => ({ default: m.HomeworkPage })))
+const HomeworkDetailPage = lazy(() =>
+  import('@/features/homework/HomeworkDetailPage').then((m) => ({ default: m.HomeworkDetailPage })),
+)
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const MyStudentsPage = lazy(() => import('@/features/tutor/MyStudentsPage').then((m) => ({ default: m.MyStudentsPage })))
 const StudentDetailPage = lazy(() =>
@@ -100,6 +104,8 @@ export const routes: RouteObject[] = [
                   { path: '/vocabulary', element: <VocabularyPage /> },
                   { path: '/vocabulary/practice/:modeId', element: <VocabularyPracticePage /> },
                   { path: '/progress', element: <ProgressPage /> },
+                  { path: '/homework', element: <HomeworkPage /> },
+                  { path: '/homework/:assignmentId', element: <HomeworkDetailPage /> },
                 ],
               },
               {

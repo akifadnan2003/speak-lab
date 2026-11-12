@@ -9,8 +9,8 @@ Last updated 2026-11-12. Status legend: ✅ done · 🔄 in progress · ⏳ plan
 | M2 | Authentication, authorization and student invitations | ✅ (live in production 2026-11-11) |
 | M3 | Curriculum and exercise engine | ✅ (live in production 2026-11-12) |
 | M4 | Vocabulary and revision | ✅ (live in production 2026-11-12) |
-| M5 | Student progress | 🔄 built on `m5-student-progress`, PR open |
-| M6 | Tutor dashboard | ⏳ |
+| M5 | Student progress | ✅ (merged 2026-11-12) |
+| M6 | Tutor dashboard | 🔄 built on `m6-tutor-workspace`, PR open |
 | M7 | AI speaking | ⏳ |
 | M8 | Advanced learning and localisation | ⏳ |
 | M9 | Production hardening | ⏳ |
@@ -168,7 +168,7 @@ evidence in `docs/VOCABULARY_PERSISTENCE.md`, ADR-018, ADR-019):
 Remaining for M4: audio assets + listening mode, spoken-use mode (M7), tutor assignment of word sets
 and a tutor view of `student_vocabulary` (M6), parameter tuning from real review data.
 
-## M5 — Student Progress 🔄
+## M5 — Student Progress ✅
 
 Design: `docs/superpowers/specs/2026-11-12-m5-student-progress-design.md`. Metric definitions:
 `docs/PROGRESS_METRICS.md`. ADR-021. Branch `m5-student-progress`.
@@ -188,10 +188,28 @@ Design: `docs/superpowers/specs/2026-11-12-m5-student-progress-design.md`. Metri
 Deferred: time on task, speaking/writing scores (M7), listening (content), tutor assignments,
 notes, grading and feedback (M6).
 
-## M6 — Tutor Dashboard ⏳
+## M6 — Tutor Dashboard and Teaching Workspace 🔄
 
-Assignments and submissions, feedback, teacher notes, lesson access management, level overrides,
-AI settings, usage and cost view. Fills the placeholder tabs on the student profile.
+Design: `docs/superpowers/specs/2026-11-12-m6-tutor-workspace-design.md`. Model and rules:
+`docs/ASSIGNMENTS.md`. ADR-022. Branch `m6-tutor-workspace`.
+
+- [x] Migration `20261112200000_tutor_workspace.sql`: `assignments`, `assignment_recipients`
+      (submission + feedback), `teacher_notes` (no student policy), five audit events, triggers that
+      own every transition and timestamp, `complete_assignment` verifying lesson / chapter-check /
+      vocabulary evidence from the learner's own records
+- [x] Tutor profile: Overview (M5 analytics, homework at a glance, quick links), Vocabulary tab
+      (server-owned SRS rows: stats, recognition vs recall, recent practice, searchable words with
+      detail), Assignments (draft or assign now, edit, cancel, publish, review panel, feedback, mark
+      reviewed, return for changes), Teacher notes (CRUD, search, topic/priority), Settings
+      (student-owned preferences read-only; access status and placement as tutor controls; AI
+      settings deferred), Curriculum (planned chapters are no longer "unlockable")
+- [x] Student: homework card on the home page, `/homework`, `/homework/:id` with server-saved
+      drafts, submit with confirmation, "Mark as done" verified by the server, tutor feedback
+- [x] Tests: 22 PGlite + 5 full-stack (CI) RLS/lifecycle tests, model and component tests, shell
+      e2e, real-auth scenario (assign, submit, review, feedback; notes invisible to the student)
+
+Deferred to later: assigning across tutors, attachments, reminders/notifications (SMTP), AI
+feedback styles, quotas and usage (M7).
 
 ## M7 — AI Speaking ⏳
 

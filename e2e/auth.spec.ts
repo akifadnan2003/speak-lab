@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
-import { adminClient, extractAuthLink, mailpitDelete, STUDENT_PASSWORD, TUTOR_PASSWORD, uniqueEmail, waitForEmail } from '../supabase/tests/helpers.ts'
+import { adminClient, extractAuthLink, mailpitDelete, STUDENT_PASSWORD, TUTOR_PASSWORD, uniqueEmail, userClient, waitForEmail } from '../supabase/tests/helpers.ts'
 import { TUTOR_STATE_FILE } from './auth.setup.ts'
 
 /**
@@ -291,6 +291,72 @@ test('student learns on this device, progress follows the account to another dev
   await again.getByTestId('chapter-card').nth(6).getByRole('link').click()
   await expect(again.getByRole('heading', { name: /Past Continuous/ })).toBeVisible()
   await device2.close()
+})
+
+test('tutor assigns written homework, the student submits it, the tutor reviews it, the student reads the feedback, and notes stay private', async ({ page, browser }) => {
+  test.setTimeout(180_000)
+  const email = uniqueEmail('e2e-homework')
+  const created = await admin.auth.admin.createUser({ email, password: STUDENT_PASSWORD, email_confirm: true, user_metadata: { full_name: 'Aysel Test' } })
+  const studentId = created.data.user!.id
+  createdUsers.push(studentId)
+  await admin.from('tutor_students').insert({ tutor_id: tutor.id, student_id: studentId })
+  await admin.from('profiles').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', studentId)
+
+  // Tutor: open the student's Assignments tab and assign written homework now.
+  await login(page, tutor.email, TUTOR_PASSWORD)
+  await page.getByTestId('student-card').filter({ hasText: email }).click()
+  await page.getByRole('tab', { name: 'Assignments' }).click()
+  await page.getByTestId('new-assignment').click()
+  await page.getByTestId('assignment-title').fill('Describe your weekend')
+  await page.getByTestId('assignment-instructions').fill('Five sentences in the past simple.')
+  await page.getByTestId('assign-now').click()
+  await expect(page.getByTestId('assignment-row')).toHaveAttribute('data-status', 'pending', { timeout: 30_000 })
+
+  // Tutor: a private note about the student.
+  await page.getByRole('tab', { name: 'Teacher notes' }).click()
+  await page.getByTestId('new-note').click()
+  await page.getByTestId('note-body').fill('Confuses subject pronouns; revisit next lesson.')
+  await page.getByTestId('save-note').click()
+  await expect(page.getByTestId('note')).toContainText('Confuses subject pronouns', { timeout: 30_000 })
+
+  // Student: the homework is on the home page; write, save, submit.
+  const device = await browser.newContext()
+  const student = await device.newPage()
+  await login(student, email, STUDENT_PASSWORD)
+  await expect(student).toHaveURL(/#\/$/)
+  await expect(student.getByTestId('homework-card')).toHaveAttribute('data-open', '1', { timeout: 30_000 })
+  await student.getByTestId('homework-card-item').click()
+  await expect(student.getByTestId('homework-status')).toHaveText('To do')
+  await student.getByTestId('homework-answer').fill('I visited my grandmother. We cooked plov.')
+  await student.getByTestId('save-draft-answer').click()
+  await expect(student.getByText('Draft saved')).toBeVisible({ timeout: 30_000 })
+  await student.getByTestId('submit-answer').click()
+  await student.getByTestId('confirm-submit-answer').click()
+  await expect(student.getByTestId('homework-status')).toHaveText('Submitted', { timeout: 30_000 })
+  await expect(student.getByTestId('homework-submitted-text')).toContainText('cooked plov')
+
+  // The student's own session cannot read teacher notes through the API.
+  const studentClient = await userClient(email, STUDENT_PASSWORD)
+  expect((await studentClient.from('teacher_notes').select('*')).data).toEqual([])
+  const notes = await admin.from('teacher_notes').select('body').eq('student_id', studentId)
+  expect(notes.data).toHaveLength(1)
+
+  // Tutor: review with feedback (the tab refetches on open; a reload also covers a stale page).
+  await page.reload()
+  await page.getByRole('tab', { name: 'Assignments' }).click()
+  await expect(page.getByTestId('assignment-row')).toHaveAttribute('data-status', 'submitted', { timeout: 30_000 })
+  await page.getByTestId('assignment-row').click()
+  await expect(page.getByTestId('submission-text')).toContainText('cooked plov')
+  await page.getByTestId('feedback-input').fill('Lovely. Next time say when you went.')
+  await page.getByTestId('mark-reviewed').click()
+  await expect(page.getByTestId('review-panel')).toHaveAttribute('data-status', 'reviewed', { timeout: 30_000 })
+
+  // Student: feedback visible, answer locked.
+  await student.reload()
+  await expect(student.getByTestId('homework-status')).toHaveText('Reviewed', { timeout: 30_000 })
+  await expect(student.getByTestId('homework-feedback')).toContainText('Lovely. Next time say when you went.')
+  await expect(student.getByTestId('homework-answer')).toHaveCount(0)
+  await device.close()
 })
 
 test('vocabulary answers follow the account, queue offline with a visible warning, and can be synced before signing out', async ({ browser }) => {

@@ -1,6 +1,6 @@
 # SpeakLab — Testing Strategy
 
-Last updated for milestone M5 (2026-11-12).
+Last updated for milestone M6 (2026-11-12).
 
 ## 1. Layers
 
@@ -105,6 +105,22 @@ CI); bump it on purpose with a green `database` job, not through `latest`.
 | Sign-out and account switching | Caches live under `['student', id, …]`; `AuthProvider.test.tsx` clears the query client; `auth.spec.ts` device 2 |
 | Desktop and mobile | `shell.spec.ts` progress scenario and overflow checks at 7 widths; `auth.spec.ts` on both projects |
 
+## 3e. M6 coverage
+
+| Requirement | Where it is proven |
+| --- | --- |
+| Assignment creation, edits, cancellation, deletion of drafts | `pglite/tutor-workspace.test.ts` (ownership, transitions, immutability after publish, cancel freezes, delete only drafts); `StudentAssignmentsSection.test.tsx` (create from authored lessons, validation, cancel confirmation) |
+| Student visibility and isolation | `pglite/tutor-workspace.test.ts` (drafts and other students' rows invisible); `assignments.test.ts` (unrelated student through PostgREST); `auth.spec.ts` |
+| Written submission, late flag, resubmission | `pglite/tutor-workspace.test.ts`; `HomeworkDetailPage.test.tsx`; `auth.spec.ts` |
+| Verified lesson / chapter-check / vocabulary completion | `pglite/tutor-workspace.test.ts` (`complete_assignment`: forged progress ignored, passed attempt required, reviews since publication, idempotent); `assignments.test.ts` |
+| Reviews and feedback access | `pglite/tutor-workspace.test.ts` (students cannot write feedback or mark themselves reviewed); `assignments.test.ts`; `auth.spec.ts` |
+| Teacher-note privacy | `pglite/tutor-workspace.test.ts`, `assignments.test.ts`, `auth.spec.ts` (student session gets no rows) |
+| Tutor and student authorization, disabled accounts, anonymous | both database suites |
+| Due dates and overdue states | `assignments/model.test.ts` |
+| Curriculum controls | `shell.spec.ts` tutor profile; `StudentCurriculumSection` planned-chapter note |
+| Mobile layouts | `shell.spec.ts` overflow checks at 7 widths |
+| Sign-out and account switching | queries under `['student', id, …]` / `['tutor', …]`, cleared by `AuthProvider` (`AuthProvider.test.tsx`); drafts are server-side |
+
 ## 4. What is covered today
 
 Unit / integration (175 tests): utils, env (incl. preview refusal when configured), theme store,
@@ -175,6 +191,9 @@ End-to-end (40 tests across two projects; set `PLAYWRIGHT_PORT` when 4173 is tak
 Shell e2e (32 tests, two projects): unchanged from M1 (manifest, deep links, navigation,
 exercise keyboard use, role isolation, dialogs, theme, overflow at 7 widths).
 
+Unit / integration added by M6 (total 349): `assignments/model`, `homework/HomeworkDetailPage`,
+`tutor/StudentAssignmentsSection`.
+
 Unit / integration added by M5 (total 336): `progress/analytics` (27 tests over fixture records)
 and `progress/ProgressPage.test.tsx` (empty state, device records, home page).
 
@@ -184,9 +203,9 @@ Unit / integration added by the M4 integration (total 306): `persistence/api`, `
 `VocabularyProvider.offline` (saving runs while `navigator.onLine` is false).
 
 Database + real-auth (CI `database` job): 21 + 10 + 7 integration tests against the local stack
-(`auth-rls.test.ts`, `progress.test.ts`, `vocabulary-rls.test.ts`), 22 PGlite tests
-(`pglite/vocabulary-rls.test.ts`, also runnable without Docker) and 7 browser scenarios (14 test
-runs across the desktop and Pixel 7 projects).
+(`auth-rls.test.ts`, `progress.test.ts`, `vocabulary-rls.test.ts`) plus 5 in `assignments.test.ts`,
+44 PGlite tests (`pglite/vocabulary-rls.test.ts`, `pglite/tutor-workspace.test.ts`, runnable without
+Docker) and 8 browser scenarios (16 test runs across the desktop and Pixel 7 projects).
 
 ## 5. Conventions
 

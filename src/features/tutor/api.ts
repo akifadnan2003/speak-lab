@@ -18,6 +18,8 @@ export interface StudentAccount {
   readonly supportLanguage: SupportLanguage
   readonly linkedAt: string
   readonly onboardingCompletedAt: string | null
+  /** Student-owned preferences (`profiles.preferences`), read-only for the tutor. */
+  preferences: Record<string, unknown>
 }
 
 export type InvitationDisplayStatus = 'pending' | 'expired' | 'accepted' | 'revoked'
@@ -83,6 +85,7 @@ const PREVIEW_STUDENTS: StudentAccount[] = DEMO_STUDENTS.map((s) => ({
   supportLanguage: 'az',
   linkedAt: '2026-10-12T09:00:00Z',
   onboardingCompletedAt: '2026-10-12T09:10:00Z',
+  preferences: {},
 }))
 
 const PREVIEW_INVITATIONS: Invitation[] = DEMO_INVITATIONS.map((i) => ({
@@ -121,6 +124,7 @@ async function fetchStudents(tutorId: string): Promise<StudentAccount[]> {
       supportLanguage: p.support_language,
       linkedAt: linkedAt.get(p.id) ?? p.created_at,
       onboardingCompletedAt: p.onboarding_completed_at,
+      preferences: p.preferences,
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName) || a.email.localeCompare(b.email))
 }

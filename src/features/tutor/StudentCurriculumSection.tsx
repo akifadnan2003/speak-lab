@@ -109,6 +109,11 @@ export function StudentCurriculumSection({ studentId, tutorId }: { studentId: st
         ) : null}
       </Card>
 
+      <p className="text-xs text-fg-muted" data-testid="curriculum-legend">
+        <span className="font-medium text-fg">Written</span> chapters can be opened once their prerequisites are done, or unlocked by you.{' '}
+        <span className="font-medium text-fg">Planned</span> chapters have no lessons yet: unlocking them opens nothing, so only <em>skip</em> is offered (it satisfies the next chapter&apos;s prerequisite).{' '}
+        <span className="font-medium text-fg">Skipped</span> chapters count as done for progression; completed progress is never overwritten.
+      </p>
       <ol className="flex flex-col gap-2" aria-label="Chapters">
         {all.map((state) => {
           const { chapter } = state
@@ -143,10 +148,15 @@ export function StudentCurriculumSection({ studentId, tutorId }: { studentId: st
                         </Button>
                       ) : (
                         <>
-                          {state.status === 'locked' ? (
+                          {state.status === 'locked' && chapter.status === 'authored' ? (
                             <Button size="sm" variant="outline" disabled={busy} onClick={() => overrides.set.mutate({ chapterId: chapter.id, kind: 'unlock' })} data-testid="unlock-chapter">
                               <LockOpen aria-hidden /> Unlock
                             </Button>
+                          ) : null}
+                          {chapter.status === 'planned' ? (
+                            <span className="self-center text-xs text-fg-muted" data-testid="planned-note">
+                              Not written yet: nothing to unlock
+                            </span>
                           ) : null}
                           {state.status !== 'completed' ? (
                             <Button size="sm" variant="ghost" disabled={busy} onClick={() => overrides.set.mutate({ chapterId: chapter.id, kind: 'skip' })} data-testid="skip-chapter">

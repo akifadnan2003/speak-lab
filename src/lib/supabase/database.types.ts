@@ -66,6 +66,11 @@ export interface AccountEventRow {
     | 'chapter_override_cleared'
     | 'assessment_submitted'
     | 'assessment_reset'
+    | 'assignment_published'
+    | 'assignment_cancelled'
+    | 'assignment_submitted'
+    | 'assignment_returned'
+    | 'assignment_reviewed'
   metadata: Record<string, unknown>
   created_at: string
 }
@@ -129,4 +134,60 @@ export interface AssessmentAttemptRow {
   expires_at: string
   submitted_at: string | null
   voided_at: string | null
+}
+
+/* ---- M6 tutor workspace (supabase/migrations/20261112200000_tutor_workspace.sql) ---- */
+
+export type AssignmentKind = 'lesson' | 'vocabulary' | 'written'
+export type AssignmentStatus = 'draft' | 'published' | 'cancelled'
+export type SubmissionStatus = 'assigned' | 'in_progress' | 'submitted' | 'reviewed'
+
+export interface AssignmentRow {
+  id: string
+  tutor_id: string
+  kind: AssignmentKind
+  title: string
+  instructions: string
+  chapter_id: string | null
+  lesson_id: string | null
+  requires_pass: boolean
+  review_target: number | null
+  due_at: string | null
+  status: AssignmentStatus
+  published_at: string | null
+  cancelled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AssignmentRecipientRow {
+  assignment_id: string
+  student_id: string
+  status: SubmissionStatus
+  draft_text: string
+  submitted_text: string | null
+  evidence: Record<string, unknown> | null
+  started_at: string | null
+  submitted_at: string | null
+  reviewed_at: string | null
+  returned_at: string | null
+  late: boolean
+  feedback: string | null
+  feedback_updated_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type TeacherNoteTopic = 'general' | 'grammar' | 'vocabulary' | 'pronunciation' | 'speaking' | 'listening' | 'reading' | 'writing' | 'behaviour' | 'planning'
+export type TeacherNotePriority = 'normal' | 'high'
+
+export interface TeacherNoteRow {
+  id: string
+  tutor_id: string
+  student_id: string
+  body: string
+  topic: TeacherNoteTopic
+  priority: TeacherNotePriority
+  created_at: string
+  updated_at: string
 }
