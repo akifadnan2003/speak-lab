@@ -24,7 +24,8 @@ const plan: LocalImportPlan = {
 }
 
 function renderCard(importer: LocalVocabularyImporter) {
-  const services = { bank: createStaticVocabularyBank(), repository: createMemoryVocabularyRepository(), storage: 'cloud' as const, importer }
+  const repository = createMemoryVocabularyRepository()
+  const services = { bank: createStaticVocabularyBank(), repository, storage: 'cloud' as const, importer, records: repository }
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <VocabularyProvider services={services}>

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { curriculumKeys, useCurriculumServices } from '@/features/curriculum/CurriculumProvider'
 import { computeProgression } from '@/features/curriculum/progression'
-import { useVocabularyBank, useVocabularyRecords } from '@/features/vocabulary/VocabularyProvider'
+import { useVocabularyBank, useVocabularyServices, vocabularyKeys } from '@/features/vocabulary/VocabularyProvider'
 import { deviceTimeZone } from '@/features/vocabulary/srs/time'
 import { computeLearningAnalytics, type LearningAnalytics, type LearningRecords } from './analytics'
 
@@ -36,10 +36,15 @@ export function useLearningAnalytics(studentId: string | null): LearningAnalytic
   const attempts = useQuery({ queryKey: curriculumKeys.attempts(id), queryFn: () => progress.listAttempts(id), enabled })
   const checks = useQuery({ queryKey: curriculumKeys.assessments(id), queryFn: () => assessments.listAttempts(id), enabled })
   const bank = useVocabularyBank()
-  const vocabulary = useVocabularyRecords(enabled ? id : null)
+  // Read-only reader: the tutor reads a linked student's rows; RLS, not the client, decides.
+  const { records: reader } = useVocabularyServices()
+  const vocabulary = {
+    states: useQuery({ queryKey: vocabularyKeys.states(id), queryFn: () => reader.listStates(id), enabled, networkMode: 'always' as const }),
+    reviews: useQuery({ queryKey: vocabularyKeys.reviews(id), queryFn: () => reader.listReviews(id), enabled, networkMode: 'always' as const }),
+  }
 
   const records = useMemo<LearningRecords | undefined>(() => {
-    if (!enabled || !chapters.data || !lessonProgress.data || !overrides.data || !attempts.data || !checks.data || !bank.data || !vocabulary.states || !vocabulary.reviews) {
+    if (!enabled || !chapters.data || !lessonProgress.data || !overrides.data || !attempts.data || !checks.data || !bank.data || !vocabulary.states.data || !vocabulary.reviews.data) {
       return undefined
     }
     return {
@@ -50,17 +55,29 @@ export function useLearningAnalytics(studentId: string | null): LearningAnalytic
       attempts: attempts.data,
       assessments: checks.data,
       vocabularyEntries: bank.data,
-      vocabularyStates: vocabulary.states,
-      vocabularyReviews: vocabulary.reviews,
+      vocabularyStates: vocabulary.states.data,
+      vocabularyReviews: vocabulary.reviews.data,
     }
-  }, [enabled, id, chapters.data, lessonProgress.data, overrides.data, attempts.data, checks.data, bank.data, vocabulary.states, vocabulary.reviews])
+  }, [enabled, id, chapters.data, lessonProgress.data, overrides.data, attempts.data, checks.data, bank.data, vocabulary.states.data, vocabulary.reviews.data])
 
   const analytics = useMemo(() => (records ? computeLearningAnalytics(records, clock) : undefined), [records, clock])
 
   return {
     analytics,
     records,
-    isLoading: enabled && records === undefined && !(chapters.error || lessonProgress.error || overrides.error || attempts.error || checks.error || bank.error || vocabulary.error),
-    error: chapters.error ?? lessonProgress.error ?? overrides.error ?? attempts.error ?? checks.error ?? bank.error ?? vocabulary.error ?? null,
+    isLoading:
+      enabled &&
+      records === undefined &&
+      !(chapters.error || lessonProgress.error || overrides.error || attempts.error || checks.error || bank.error || vocabulary.states.error || vocabulary.reviews.error),
+    error:
+      chapters.error ??
+      lessonProgress.error ??
+      overrides.error ??
+      attempts.error ??
+      checks.error ??
+      bank.error ??
+      vocabulary.states.error ??
+      vocabulary.reviews.error ??
+      null,
   }
 }
