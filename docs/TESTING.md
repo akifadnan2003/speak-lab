@@ -21,7 +21,7 @@ Last updated for milestone M4 integration (2026-11-12).
 npm run typecheck
 npm run lint
 npm run test              # vitest run (jsdom)
-npm run test:e2e          # builds with VITE_UI_PREVIEW=true, serves /speak-lab/, Playwright shell suite
+npm run test:e2e          # builds with VITE_UI_PREVIEW=true, serves at /, Playwright shell suite
 npm run check             # typecheck + lint + sync check + test + build
 npm run test:db:pglite    # migrations + RLS against PGlite, no Docker needed
 
@@ -142,7 +142,8 @@ Unit / integration added by M4 (56 tests, total 171):
 
 End-to-end (36 tests across two projects):
 
-- Base path, manifest (`start_url`, `scope`, `display`), service worker reachable.
+- Root base path, manifest (`start_url`, `scope`, `id`, `display`), service worker reachable and free of
+  `/speak-lab/`; the old project path is not served; `CNAME` ships with the build.
 - Deep hash route direct navigation and refresh (`/learn/a0-01`).
 - Preview banner visible.
 - Student navigation through bottom bar (mobile) / sidebar (desktop).

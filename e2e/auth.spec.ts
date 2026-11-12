@@ -4,7 +4,7 @@ import { adminClient, extractAuthLink, mailpitDelete, STUDENT_PASSWORD, TUTOR_PA
 import { TUTOR_STATE_FILE } from './auth.setup.ts'
 
 /**
- * Real authentication flows through the production bundle served under /speak-lab/ against the
+ * Real authentication flows through the production bundle served at the site root against the
  * local Supabase stack. Emails are real GoTrue emails read from Mailpit; links are opened as
  * delivered (query string before the hash), exactly as on GitHub Pages.
  */

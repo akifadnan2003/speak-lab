@@ -5,12 +5,12 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 /**
- * SpeakLab is deployed as a GitHub Pages *project* site, so everything lives
- * under `/speak-lab/`. The base path drives asset URLs, the PWA scope and the
- * service-worker registration. Override with VITE_BASE_PATH for local
- * experiments (for example `/`).
+ * SpeakLab is served at the root of its custom domain (https://speaklab.akiflabs.net/, GitHub
+ * Pages with a CNAME; ADR-020). The base path drives asset URLs, the PWA scope and the
+ * service-worker registration. Override with VITE_BASE_PATH for a sub-path deployment
+ * (for example the old project-site path `/speak-lab/`).
  */
-const BASE_PATH = process.env.VITE_BASE_PATH ?? '/speak-lab/'
+const BASE_PATH = process.env.VITE_BASE_PATH ?? '/'
 
 // A build must never combine the demo preview session with a real backend. `config/env.ts`
 // also refuses it at runtime; failing the build makes the mistake impossible to deploy.

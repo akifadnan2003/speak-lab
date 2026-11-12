@@ -82,7 +82,7 @@ the app uses, so a locked check cannot be started by URL. Answers are validated 
 Zod `AnswerSchema`; unknown or mistyped answers grade as empty. Stored `results` never contain the
 answer key. Every submission and reset is logged in `account_events`.
 
-## 5. Authentication flow on GitHub Pages
+## 5. Authentication flow on GitHub Pages (custom domain `speaklab.akiflabs.net`)
 
 - Email templates link straight to the app with `token_hash` (ADR-009). `captureAuthRedirect()`
   runs before React mounts, keeps the material in memory, and rewrites the address bar to

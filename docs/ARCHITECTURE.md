@@ -89,11 +89,15 @@ idempotency keys to prevent duplicates on sync.
 
 ## 3. Routing and GitHub Pages
 
-- `base: '/speak-lab/'` in Vite; all assets, the manifest, `start_url`, `scope` and the service
-  worker registration respect it. `VITE_BASE_PATH` overrides for local experiments.
+- The site is served at the root of the custom domain `https://speaklab.akiflabs.net/`
+  (`base: '/'` in Vite; `public/CNAME` keeps the domain attached to every Pages deployment;
+  ADR-020). All assets, the manifest, `start_url`, `scope`, `id` and the service worker
+  registration respect the base path. `VITE_BASE_PATH` overrides it for a sub-path deployment.
+  GitHub redirects the old project-site URL `akifadnan2003.github.io/speak-lab/` to the custom
+  domain.
 - Hash routing (`createHashRouter`) so deep links and refreshes work on static hosting without
   relying on a 404 redirect hack. A `404.html` copy and `.nojekyll` are still emitted as a safety net.
-- Auth email links target `https://akifadnan2003.github.io/speak-lab/?token_hash=…&type=…` (query
+- Auth email links target `https://speaklab.akiflabs.net/?token_hash=…&type=…` (query
   before the hash). `captureAuthRedirect()` consumes and scrubs them before the router mounts and
   the in-app `/auth/callback` route shows the outcome. Details in `docs/SECURITY.md` and ADR-009.
 

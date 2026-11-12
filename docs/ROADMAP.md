@@ -22,7 +22,7 @@ strategy documented. Outcome: this `docs/` folder, `CLAUDE.md`, `README.md`.
 
 ## M1 — Application Foundation and Design System ✅
 
-- [x] Vite + React 19 + TypeScript strict project under `/speak-lab/`
+- [x] Vite + React 19 + TypeScript strict project (project site `/speak-lab/`; custom domain root since 2026-11-12, ADR-020)
 - [x] Design tokens (light/dark), Inter typography, spacing, radius, shadows, motion
 - [x] Accessible primitives (Radix + cva), layout shell (sidebar, top bar, bottom nav, drawer)
 - [x] Hash routing with lazy routes; fail-closed guards; role-scoped routes

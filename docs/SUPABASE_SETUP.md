@@ -24,10 +24,11 @@ Project in use: `https://bpxklwlotpqnfonpnjuc.supabase.co` (dedicated SpeakLab p
 
 | Setting | Value |
 | --- | --- |
-| Site URL | `https://akifadnan2003.github.io/speak-lab/` |
-| Redirect URLs | `https://akifadnan2003.github.io/speak-lab/`, `http://localhost:5173/speak-lab/`, `http://localhost:4173/speak-lab/` |
+| Site URL | `https://speaklab.akiflabs.net/` |
+| Redirect URLs | `https://speaklab.akiflabs.net/`, `https://akifadnan2003.github.io/speak-lab/` (old address, keep during the migration), `http://localhost:5173/`, `http://localhost:4173/` |
 
-The app passes the exact app URL as `redirectTo`; Supabase only honours URLs on this list.
+The app passes the exact app URL as `redirectTo` (its own origin plus base path); Supabase only
+honours URLs on this list. The custom-domain migration runbook is `docs/CUSTOM_DOMAIN.md`.
 
 ### 1.3 Authentication → Emails → SMTP Settings (required first)
 
@@ -134,7 +135,7 @@ run, keyed on the **verified Auth user id**. No endpoint in the app can grant it
    message if the user does not exist, is not confirmed, or if a different tutor already exists.
    A partial unique index (`profiles_single_tutor_idx`) makes a second tutor impossible even for
    the service role. The event is recorded in `account_events` (`owner_bootstrapped`).
-4. Sign in at `https://akifadnan2003.github.io/speak-lab/` with that email and password. You land
+4. Sign in at `https://speaklab.akiflabs.net/` with that email and password. You land
    on **My Students**.
 
 Students are never bootstrapped; they only exist through invitations.
@@ -145,7 +146,7 @@ Students are never bootstrapped; they only exist through invitations.
   session with the Auth server, checks `profiles.role = 'tutor'` and `status = 'active'`, then
   calls `auth.admin.inviteUserByEmail` with the service key (server-side only).
 - Supabase sends the **Invite user** email. The link opens the app at
-  `https://akifadnan2003.github.io/speak-lab/?token_hash=…&type=invite`. The app verifies the
+  `https://speaklab.akiflabs.net/?token_hash=…&type=invite`. The app verifies the
   token, creates the session, scrubs the token from the address bar, and takes the student to
   `/welcome` to choose a password and preferences.
 - Acceptance is recorded by database triggers (profile `invited → active`, invitation `accepted`,

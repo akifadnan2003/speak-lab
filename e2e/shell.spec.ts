@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * Shell-level end-to-end checks against the production build served under
- * /speak-lab/ with VITE_UI_PREVIEW=true (see playwright.config.ts).
+ * Shell-level end-to-end checks against the production build served at the site root
+ * (as on https://speaklab.akiflabs.net/) with VITE_UI_PREVIEW=true (see playwright.config.ts).
  */
 
 const WIDTHS = [320, 375, 390, 430, 768, 1024, 1440]
@@ -14,19 +14,34 @@ async function setRole(page: Page, role: 'student' | 'tutor') {
 }
 
 test.describe('deployment basics', () => {
-  test('serves the app under the project base path with a manifest and service worker', async ({ page, request }) => {
+  test('serves the app at the site root with a manifest and service worker scoped to /', async ({ page, request }) => {
     await page.goto('./#/')
     await expect(page).toHaveTitle('SpeakLab')
     const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href')
-    expect(manifestHref).toContain('/speak-lab/manifest.webmanifest')
+    expect(manifestHref).toBe('/manifest.webmanifest')
     const manifest = await request.get(manifestHref!)
     expect(manifest.ok()).toBeTruthy()
     const json = await manifest.json()
-    expect(json.start_url).toBe('/speak-lab/')
-    expect(json.scope).toBe('/speak-lab/')
+    expect(json.start_url).toBe('/')
+    expect(json.scope).toBe('/')
+    expect(json.id).toBe('/')
     expect(json.display).toBe('standalone')
-    const sw = await request.get('/speak-lab/sw.js')
+    const sw = await request.get('/sw.js')
     expect(sw.ok()).toBeTruthy()
+    expect(await sw.text()).not.toContain('/speak-lab/')
+  })
+
+  test('nothing in the shell still depends on the old /speak-lab/ project path', async ({ page, request }) => {
+    const html = await (await request.get('/')).text()
+    expect(html).not.toContain('/speak-lab/')
+    expect(html).toContain('/assets/')
+    // The old path holds no manifest in this build (on GitHub it redirects to the custom domain;
+    // the local preview server answers with the SPA fallback instead).
+    expect((await request.get('/speak-lab/manifest.webmanifest')).headers()['content-type'] ?? '').not.toContain('manifest')
+    // The CNAME that keeps the custom domain attached ships with the build.
+    expect((await (await request.get('/CNAME')).text()).trim()).toBe('speaklab.akiflabs.net')
+    await page.goto('./#/')
+    await expect(page).toHaveTitle('SpeakLab')
   })
 
   test('direct navigation and refresh survive on a deep hash route', async ({ page }) => {

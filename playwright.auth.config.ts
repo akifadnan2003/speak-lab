@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const PORT = 4173
-const BASE_PATH = '/speak-lab/'
+const BASE_PATH = '/'
 
 /**
  * Real-authentication end-to-end tests. The production bundle is built against the LOCAL

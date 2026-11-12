@@ -109,7 +109,7 @@ jobs:
         if: ${{ inputs.functions && !inputs.dry_run }}
         run: |
           supabase secrets set \
-            SPEAKLAB_ALLOWED_APP_URLS="https://akifadnan2003.github.io/speak-lab/,http://localhost:5173/speak-lab/" \
+            SPEAKLAB_ALLOWED_APP_URLS="https://speaklab.akiflabs.net/,https://akifadnan2003.github.io/speak-lab/,http://localhost:5173/" \
             SPEAKLAB_INVITE_TTL_SECONDS="3600" \
             --yes
       - name: Migration state after deploy (hosted project via Session pooler)

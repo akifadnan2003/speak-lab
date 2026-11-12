@@ -22,7 +22,7 @@ in shadcn-style components with `cva`; Lucide icons; Inter Variable self-hosted.
 
 **Context.** GitHub Pages serves `index.html` only at the project root. Options: hash routing, or
 browser routing with a `404.html` redirect trick that rewrites the path into a query string.
-**Decision.** `createHashRouter`. URLs look like `/speak-lab/#/learn/a2-07`.
+**Decision.** `createHashRouter`. URLs look like `/#/learn/a2-07` (originally `/speak-lab/#/…` on the project site; ADR-020).
 **Consequences.** Direct navigation, refresh and PWA `start_url` work without redirects or flashes.
 Supabase auth redirects target the root URL; `?code=` arrives before the hash and is consumed by
 supabase-js. Trade-off: hash URLs are slightly less elegant; a `404.html` copy is still emitted as a
@@ -262,3 +262,25 @@ unchanged.
 **Consequences.** The UI never claims more than the server holds. Losing queued answers is an
 explicit choice, never a side effect. Other features that queue work (drafts, offline attempts)
 plug into the same registry without touching auth code.
+
+## ADR-020 · Custom domain at the site root, hash routing kept (2026-11-12)
+
+**Context.** SpeakLab moved from the GitHub Pages project site `akifadnan2003.github.io/speak-lab/`
+to the custom domain `speaklab.akiflabs.net` (GoDaddy CNAME to `akifadnan2003.github.io`, HTTPS
+enforced, certificate issued). A project site lives under `/speak-lab/`; a custom domain serves
+the repository at `/`. Sessions, caches and offline queues are origin-scoped, so the move changes
+the application's origin.
+**Decision.** The production base path becomes `/` (`VITE_BASE_PATH` still allows a sub-path
+build). `public/CNAME` ships with every artifact so the domain stays attached to the Pages site
+whatever deployment method is used; the deploy workflow fails if the build still references
+`/speak-lab/` or lacks the CNAME. Hash routing is kept: it needs no server rewrite, and the
+`404.html` + `.nojekyll` safety net stays. Auth redirects are derived from `window.location.origin`
+plus the base path (`appRedirectUrl`), so the app needs no hostname constant; the Supabase *Site
+URL* and *Redirect URLs* and the `student-admin` allow-list (`SPEAKLAB_ALLOWED_APP_URLS`) list the
+custom domain first and keep the old URL during the migration because emailed links may still
+carry it (GitHub redirects it to the custom domain, path and query preserved). The old URL is
+removed from both lists once no invitation or recovery link older than the OTP expiry can exist.
+**Consequences.** Every user signs in again once on the new origin (sessions do not transfer).
+Anything queued offline on the old origin cannot be flushed any more, because the old origin is
+no longer served; the migration runbook (`docs/CUSTOM_DOMAIN.md`) says how to check. No data in
+Supabase changes. Local development and the Playwright suites now run at `/` as well.

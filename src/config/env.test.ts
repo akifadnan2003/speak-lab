@@ -7,7 +7,7 @@ describe('parseEnv', () => {
     expect(env.supabaseConfigured).toBe(false)
     expect(env.supabaseUrl).toBeNull()
     expect(env.uiPreview).toBe(false)
-    expect(env.basePath).toBe('/speak-lab/')
+    expect(env.basePath).toBe('/')
   })
 
   it('treats empty strings as unset', () => {
