@@ -100,7 +100,8 @@ test('tutor invites a student; the student accepts the emailed link, sets a pass
   await student.getByLabel('Daily speaking target (minutes)').fill('20')
   await student.getByRole('button', { name: 'Start learning' }).click()
   await expect(student).toHaveURL(/#\/$/)
-  await expect(student.getByText(/recommended lesson/i)).toBeVisible()
+  await expect(student.getByTestId('continue-card')).toBeVisible()
+  await expect(student.getByTestId('home-metrics')).toBeVisible({ timeout: 30_000 })
 
   // Refreshing a protected route keeps the session.
   await student.goto('./#/settings')
