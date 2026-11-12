@@ -1,12 +1,12 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const PORT = 4173
-const BASE_PATH = '/speak-lab/'
+const BASE_PATH = '/'
 
 /**
  * End-to-end tests run against the production build served by `vite preview`
- * so the GitHub Pages base path, hash routing and PWA manifest are exercised
- * exactly as deployed. Preview mode is enabled so the UI shells render with
+ * so the root base path of the custom domain, hash routing and PWA manifest are
+ * exercised exactly as deployed. Preview mode is enabled so the UI shells render with
  * clearly-labelled demo data (see docs/TESTING.md).
  */
 export default defineConfig({

@@ -184,7 +184,7 @@ export async function inviteAndAccept(
   tutorToken: string,
   email: string,
   fullName: string,
-  redirectTo = 'http://localhost:4173/speak-lab/',
+  redirectTo = 'http://localhost:4173/',
 ): Promise<{ client: SupabaseClient; userId: string; invitationId: string }> {
   const invited = await callFunction({ action: 'invite', email, fullName, redirectTo }, tutorToken)
   if (!invited.json.ok) throw new Error(`invite failed: ${JSON.stringify(invited.json)}`)

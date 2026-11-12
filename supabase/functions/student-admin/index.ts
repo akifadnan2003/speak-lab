@@ -23,7 +23,9 @@ const SECRET_KEY = readSecretKey()
 const INVITE_TTL_SECONDS = Number(Deno.env.get('SPEAKLAB_INVITE_TTL_SECONDS') ?? '3600')
 const ALLOWED_APP_URLS = (
   Deno.env.get('SPEAKLAB_ALLOWED_APP_URLS') ??
-  'https://akifadnan2003.github.io/speak-lab/,http://localhost:4173/speak-lab/,http://localhost:5173/speak-lab/,http://127.0.0.1:4173/speak-lab/'
+  // Custom domain first; the old project-site URL stays during the migration (it redirects to the
+  // custom domain) and is removed once no email link to it can still be valid.
+  'https://speaklab.akiflabs.net/,https://akifadnan2003.github.io/speak-lab/,http://localhost:4173/,http://localhost:5173/,http://127.0.0.1:4173/'
 )
   .split(',')
   .map((s) => s.trim())

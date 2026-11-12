@@ -3,7 +3,8 @@
 A premium, mobile-first, AI-powered English academy. Invitation-only, speaking-first, built for a
 tutor and their students.
 
-**Production:** https://akifadnan2003.github.io/speak-lab/
+**Production:** https://speaklab.akiflabs.net/ (custom domain on GitHub Pages; the old
+`akifadnan2003.github.io/speak-lab/` address redirects here)
 **Status:** Milestone M2 complete (authentication, authorization, invitations). See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -26,7 +27,7 @@ GitHub Actions → GitHub Pages.
 npm install
 cp .env.example .env.local        # local Supabase values from `npx supabase status`; never commit secrets
 npx supabase start                # local Postgres/Auth/Edge Functions/Mailpit (needs Docker)
-npm run dev                       # http://localhost:5173/speak-lab/
+npm run dev                       # http://localhost:5173/
 ```
 
 To review the UI shells without a backend, leave the Supabase values empty and set
@@ -42,7 +43,7 @@ To review the UI shells without a backend, leave the Supabase values empty and s
 | `npm run test:db` | Authorization / lifecycle tests against the local Supabase stack |
 | `npm run test:e2e:auth` | Real invitation, recovery and disable flows in the browser (local stack) |
 | `npm run build` | Production build into `dist/` |
-| `npm run preview` | Serve `dist/` locally under `/speak-lab/` |
+| `npm run preview` | Serve `dist/` locally at `/` (as on the custom domain) |
 | `npm run check` | typecheck + lint + test + build |
 | `npm run icons` | Regenerate PWA icons from `public/icon-source.svg` |
 

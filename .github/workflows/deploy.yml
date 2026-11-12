@@ -41,8 +41,9 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Project site: https://akifadnan2003.github.io/speak-lab/
-          VITE_BASE_PATH: /speak-lab/
+          # Custom domain at the site root: https://speaklab.akiflabs.net/ (public/CNAME keeps the
+          # domain attached; ADR-020). The old project-site URL redirects here.
+          VITE_BASE_PATH: /
           # Public values only (publishable key). The build refuses VITE_UI_PREVIEW alongside these.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
@@ -53,6 +54,12 @@ jobs:
         run: |
           if grep -rqE 'sb_secret_[A-Za-z0-9_-]{20,}' dist/assets; then echo "::error::secret key found in bundle"; exit 1; fi
           if grep -rqE '"role":"service_role"|service_role' dist/assets; then echo "::error::service-role material found in bundle"; exit 1; fi
+      - name: Verify the build is rooted at the custom domain
+        # Nothing may still point at the old project-site path, and the CNAME must ship with the
+        # artifact so the custom domain survives every deployment.
+        run: |
+          if grep -rq '/speak-lab/' dist/index.html dist/manifest.webmanifest dist/sw.js dist/assets; then echo "::error::old /speak-lab/ base path found in the build"; exit 1; fi
+          test "$(cat dist/CNAME)" = "speaklab.akiflabs.net" || { echo "::error::dist/CNAME missing or wrong"; exit 1; }
       - name: Add SPA fallbacks
         run: |
           cp dist/index.html dist/404.html

@@ -235,12 +235,12 @@ describe('13 · invalid, expired, resent and revoked invitations', () => {
 describe('10 · password reset (real email link)', () => {
   it('lets a student choose a new password via the recovery link', async () => {
     const seen = new Set<string>()
-    const { error } = await anonClient().auth.resetPasswordForEmail(studentB.email, { redirectTo: 'http://localhost:4173/speak-lab/' })
+    const { error } = await anonClient().auth.resetPasswordForEmail(studentB.email, { redirectTo: 'http://localhost:4173/' })
     expect(error).toBeNull()
     const mail = await waitForEmail(studentB.email, seen)
     const link = extractAuthLink(mail.html, mail.text)
     expect(link.searchParams.get('type')).toBe('recovery')
-    expect(link.href.startsWith('http://localhost:4173/speak-lab/?')).toBe(true)
+    expect(link.href.startsWith('http://localhost:4173/?')).toBe(true)
 
     const client = anonClient()
     const verified = await client.auth.verifyOtp({ token_hash: link.searchParams.get('token_hash')!, type: 'recovery' })

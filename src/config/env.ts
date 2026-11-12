@@ -50,7 +50,7 @@ export function parseEnv(raw: Record<string, string | undefined>, isDev: boolean
     supabaseAnonKey,
     supabaseConfigured,
     uiPreview: previewRequested && !supabaseConfigured,
-    basePath: data.VITE_BASE_PATH || '/speak-lab/',
+    basePath: data.VITE_BASE_PATH || '/',
     isDev,
   }
 }

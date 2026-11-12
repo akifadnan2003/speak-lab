@@ -5,7 +5,8 @@ This file is read at the start of every Claude Code session. Keep it short, curr
 ## What this is
 
 SpeakLab: invitation-only, speaking-first English academy for a single tutor (the repository owner)
-and their students. Mobile-first PWA on GitHub Pages at `/speak-lab/`, Supabase backend.
+and their students. Mobile-first PWA on GitHub Pages at https://speaklab.akiflabs.net/ (custom
+domain, base path `/`, `public/CNAME`), Supabase backend.
 Full spec: `docs/PRODUCT_SPEC.md`. Roadmap and current milestone: `docs/ROADMAP.md`.
 Supabase operations (setup, bootstrap, deploy, rollback): `docs/SUPABASE_SETUP.md`.
 
