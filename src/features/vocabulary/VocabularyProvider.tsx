@@ -131,6 +131,8 @@ export function useVocabularyMutations(studentId: string) {
       await repository.recordReview(review)
     },
     onSuccess: invalidate,
+    // `mutate()` swallows rejections; a lost answer must at least be visible in the console.
+    onError: (error) => console.error('[speaklab] vocabulary answer was not saved', error),
   })
   const reset = useMutation({ mutationFn: () => repository.clear(studentId), onSuccess: invalidate })
   return { saveReview, reset }
