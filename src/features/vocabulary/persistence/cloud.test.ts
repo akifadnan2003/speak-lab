@@ -318,3 +318,34 @@ describe('permanent rejections', () => {
     expect(onSyncProblem).toHaveBeenCalledWith(expect.objectContaining({ rejected: [{ id: step.review.id, reason: 'unknown_mode' }] }))
   })
 })
+
+describe('queue notifications (pending-sync indicator)', () => {
+  it('notifies subscribers when answers are queued, sent, dropped and disposed', async () => {
+    const server = createFakeVocabularyServer()
+    server.sessionUserId = A
+    const { repo } = device(server)
+    const counts: number[] = []
+    const unsubscribe = repo.subscribe(() => counts.push(repo.pendingCount(A)))
+
+    server.online = false
+    const step = answer(createInitialState(A, 'v-hello', new Date(T0)), 'active_recall', true, T0)
+    await save(repo, step)
+    expect(counts).toEqual([1])
+
+    server.online = true
+    await repo.flush()
+    expect(counts).toEqual([1, 0])
+    expect(repo.pendingCount(A)).toBe(0)
+
+    server.online = false
+    await save(repo, answer(step.state, 'active_recall', true, T0 + DAY_MS))
+    expect(counts.at(-1)).toBe(1)
+    repo.dispose()
+    expect(counts.at(-1)).toBe(0)
+
+    unsubscribe()
+    server.online = true
+    await save(repo, answer(step.state, 'active_recall', true, T0 + 2 * DAY_MS))
+    expect(counts).toHaveLength(4)
+  })
+})

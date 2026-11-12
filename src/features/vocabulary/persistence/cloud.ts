@@ -44,10 +44,17 @@ export interface CloudVocabularyOptions {
   readonly scheduleRetry?: (run: () => void, delayMs: number) => () => void
 }
 
-export interface CloudVocabularyRepository extends VocabularyRepository {
+/** The part of a cloud repository the UI needs for "answers waiting to sync" and explicit sync. */
+export interface VocabularySync {
   /** Sends the signed-in student's queued reviews. Never throws; returns what happened. */
   flush(): Promise<SyncReport>
+  /** Reviews queued on this device for `studentId` that the server has not accepted yet. */
   pendingCount(studentId: string): number
+  /** Notifies after every change to the queue (added, sent, dropped). Returns an unsubscribe function. */
+  subscribe(listener: () => void): () => void
+}
+
+export interface CloudVocabularyRepository extends VocabularyRepository, VocabularySync {
   /** Words due at or before `now` (server query), with queued optimistic states applied. */
   listDueStates(studentId: string, now: Date): Promise<readonly VocabularyState[]>
   /** Forgets everything held on this device: caches, the review queue and timers (sign-out, account switch). */
@@ -81,6 +88,10 @@ export function createCloudVocabularyRepository(options: CloudVocabularyOptions)
   let inflight: Promise<SyncReport> | null = null
   let cancelRetry: (() => void) | null = null
   let retryDelay = 0
+  const listeners = new Set<() => void>()
+  const notify = () => {
+    for (const listener of listeners) listener()
+  }
 
   const onOnline = () => void flush()
   if (typeof window !== 'undefined') window.addEventListener('online', onOnline)
@@ -145,6 +156,7 @@ export function createCloudVocabularyRepository(options: CloudVocabularyOptions)
         // Every item in an answered batch reached a final status; none can succeed on retry.
         outbox.remove(owner, ids)
         retryDelay = 0
+        notify()
       } catch (error) {
         const syncError =
           error instanceof VocabularySyncError ? error : new VocabularySyncError('network', String(error), undefined, { cause: error })
@@ -155,6 +167,7 @@ export function createCloudVocabularyRepository(options: CloudVocabularyOptions)
           // The batch itself was refused (malformed); retrying would loop forever.
           outbox.remove(owner, ids)
           rejected.push(...ids.map((id) => ({ id, reason: syncError.code ?? 'invalid' })))
+          notify()
         }
         // 'account': session and queue disagree. Keep the queue; it is purged on sign-out/switch.
         const report: SyncReport = { sent, statuses, rejected, error: syncError }
@@ -221,6 +234,7 @@ export function createCloudVocabularyRepository(options: CloudVocabularyOptions)
         ...(state && state.lastReviewedAt === review.reviewedAt ? { state } : {}),
         attempts: 0,
       })
+      notify()
       // Durably queued: a network failure here is not a failure to save.
       await flush()
     },
@@ -257,12 +271,18 @@ export function createCloudVocabularyRepository(options: CloudVocabularyOptions)
       outbox.remove(studentId, outbox.list(studentId).map((i) => i.review.id))
       stateCache.delete(studentId)
       reviewCache.delete(studentId)
+      notify()
     },
 
     flush,
 
     pendingCount(studentId) {
       return outbox.list(studentId).length
+    },
+
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
     },
 
     dispose() {
@@ -273,6 +293,7 @@ export function createCloudVocabularyRepository(options: CloudVocabularyOptions)
       cancelRetry?.()
       cancelRetry = null
       retryDelay = 0
+      notify()
     },
   }
 }

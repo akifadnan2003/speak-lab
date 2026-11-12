@@ -1,12 +1,13 @@
 /* oxlint-disable react/only-export-components -- provider module exporting its hooks */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react'
+import { registerPendingLocalWork } from '@/lib/local-data'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import { createLocalVocabularyImporter, type LocalVocabularyImporter } from './cloud-import'
 import { createStaticVocabularyBank } from './content'
 import { createSupabaseVocabularyApi } from './persistence/api'
 import { ensureVocabularyCleanupRegistered, trackVocabularyRepository } from './persistence/cleanup'
-import { createCloudVocabularyRepository } from './persistence/cloud'
+import { createCloudVocabularyRepository, type VocabularySync } from './persistence/cloud'
 import { createLocalStorageVocabularyRepository } from './persistence/local-storage'
 import type { VocabularyBankSource, VocabularyRepository, VocabularyReviewRecord, VocabularyState } from './ports'
 
@@ -23,6 +24,8 @@ export interface VocabularyServices {
   readonly repository: VocabularyRepository
   readonly storage: 'device' | 'cloud'
   readonly importer?: LocalVocabularyImporter
+  /** Queue status and explicit sync; absent when progress stays on the device. */
+  readonly sync?: VocabularySync
 }
 
 const VocabularyContext = createContext<VocabularyServices | null>(null)
@@ -41,7 +44,23 @@ export function createDefaultVocabularyServices(): VocabularyServices {
   const getSessionUserId = async () => (await client.auth.getSession()).data.session?.user.id ?? null
   const repository = createCloudVocabularyRepository({ api, getSessionUserId })
   trackVocabularyRepository(repository)
-  return { bank, repository, storage: 'cloud', importer: createLocalVocabularyImporter({ device, api, getSessionUserId }) }
+  // Lets the sign-out screen warn about answers still queued on this device and offer to send
+  // them first. `flush` only ever sends the signed-in account's own queue.
+  registerPendingLocalWork((studentId) => ({
+    label: 'vocabulary answers',
+    count: repository.pendingCount(studentId),
+    flush: async () => {
+      await repository.flush()
+      return repository.pendingCount(studentId)
+    },
+  }))
+  return {
+    bank,
+    repository,
+    storage: 'cloud',
+    importer: createLocalVocabularyImporter({ device, api, getSessionUserId }),
+    sync: repository,
+  }
 }
 
 let defaults: VocabularyServices | null = null
@@ -57,6 +76,21 @@ export function VocabularyProvider({ services, children }: { services?: Vocabula
 
 export function useVocabularyServices(): VocabularyServices {
   return useContext(VocabularyContext) ?? getDefaults()
+}
+
+const noop = () => () => undefined
+
+/**
+ * Answers recorded on this device that the server has not accepted yet (offline, outage).
+ * Always 0 in device mode. Updates whenever the queue changes.
+ */
+export function useVocabularyPendingCount(studentId: string | null): number {
+  const { sync } = useVocabularyServices()
+  return useSyncExternalStore(
+    sync ? sync.subscribe : noop,
+    () => (sync && studentId ? sync.pendingCount(studentId) : 0),
+    () => 0,
+  )
 }
 
 export const vocabularyKeys = {

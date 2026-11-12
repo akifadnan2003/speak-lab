@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useCurrentUser } from '@/features/auth/AuthProvider'
 import { AzHelpProvider } from '@/features/curriculum/az-help'
 import { useProgression } from '@/features/curriculum/CurriculumProvider'
+import { PendingSyncBadge } from './components/PendingSyncBadge'
 import { VocabularySession } from './components/VocabularySession'
 import { findMode } from './modes'
 import { buildRevisionQueue } from './revision/queue'
@@ -96,6 +97,7 @@ export function VocabularyPracticePage() {
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{mode.label}</h1>
           <p className="text-sm text-fg-muted">{mode.description}</p>
         </div>
+        <PendingSyncBadge />
         <Card>
           <CardContent>
             {queue.length === 0 ? (

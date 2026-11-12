@@ -37,7 +37,8 @@ import { SUPPORT_LANGUAGE_LABEL, SUPPORT_LANGUAGES, VOCAB_TOPIC_LABEL, VOCAB_TOP
 import { accuracy } from './srs/scheduler'
 import { deviceTimeZone } from './srs/time'
 import { computeVocabularyStats } from './stats'
-import { useVocabularyBank, useVocabularyMutations, useVocabularyRecords, useVocabularyServices } from './VocabularyProvider'
+import { PendingSyncBadge } from './components/PendingSyncBadge'
+import { useVocabularyBank, useVocabularyMutations, useVocabularyPendingCount, useVocabularyRecords, useVocabularyServices } from './VocabularyProvider'
 
 const STAGE_VARIANT: Record<VocabularyStage, 'neutral' | 'info' | 'primary' | 'success'> = {
   new: 'neutral',
@@ -60,6 +61,7 @@ function VocabularyDashboard() {
   const records = useVocabularyRecords(user?.id ?? null)
   const progression = useProgression(user?.id ?? null)
   const { storage } = useVocabularyServices()
+  const pending = useVocabularyPendingCount(user?.id ?? null)
   const { reset } = useVocabularyMutations(user?.id ?? '')
   // "Now" is fixed when the screen opens so the numbers do not drift between renders.
   const [openedAt] = useState(() => new Date())
@@ -101,13 +103,14 @@ function VocabularyDashboard() {
         title="Words and phrases"
         description="Spaced repetition keeps the words you know from fading. Recognition and active recall are tracked separately."
         actions={
-          <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted">
+          <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted" data-testid="vocab-storage-label">
             <Smartphone className="size-3.5" aria-hidden />
-            {storage === 'device' ? 'Progress saved on this device' : 'Saved to your account (answers given offline sync on reconnect)'}
+            {storage === 'device' ? 'Progress saved on this device' : pending > 0 ? `Saved to your account · ${pending} waiting to sync` : 'Saved to your account'}
           </span>
         }
       />
 
+      <PendingSyncBadge />
       {storage === 'cloud' && <LocalImportCard studentId={user!.id} />}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="vocab-stats">

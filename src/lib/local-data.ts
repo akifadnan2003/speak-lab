@@ -14,6 +14,10 @@
  *  - Every other `speaklab.*` key in localStorage/sessionStorage is student data and is removed.
  *  - Feature modules (e.g. M3's localStorage progress repository) register a cleaner with
  *    `registerLocalDataCleaner(clearStoredProgress)`.
+ *  - A feature that queues work for the server on the device (M4's offline vocabulary answers)
+ *    also registers a *pending work* reporter, so the sign-out screen can warn before the purge
+ *    and offer an explicit sync. Flushing is the feature's own code and only ever sends the
+ *    signed-in account's queue; the registry never moves data between accounts.
  */
 export const LOCAL_DATA_PREFIX = 'speaklab.'
 export const ACTIVE_USER_KEY = 'speaklab.active-user'
@@ -27,6 +31,52 @@ const cleaners = new Set<Cleaner>()
 export function registerLocalDataCleaner(cleaner: Cleaner): () => void {
   cleaners.add(cleaner)
   return () => cleaners.delete(cleaner)
+}
+
+/** Work a feature still holds on this device for one student that has not reached the server. */
+export interface PendingLocalWork {
+  /** Short plural noun for the UI, e.g. "vocabulary answers". */
+  readonly label: string
+  readonly count: number
+  /** Sends what it can for the signed-in account and resolves with how many items are still pending. */
+  flush(): Promise<number>
+}
+
+type PendingReporter = (studentId: string) => PendingLocalWork | null
+const pendingReporters = new Set<PendingReporter>()
+
+/** Registers a reporter of queued, unsent student work. Returns an unregister function. */
+export function registerPendingLocalWork(reporter: PendingReporter): () => void {
+  pendingReporters.add(reporter)
+  return () => pendingReporters.delete(reporter)
+}
+
+/** Everything still queued on this device for `studentId` (only entries with a count above zero). */
+export function listPendingLocalWork(studentId: string): PendingLocalWork[] {
+  const result: PendingLocalWork[] = []
+  for (const report of pendingReporters) {
+    try {
+      const work = report(studentId)
+      if (work && work.count > 0) result.push(work)
+    } catch (error) {
+      console.warn('[speaklab] pending work reporter failed', error)
+    }
+  }
+  return result
+}
+
+/** Tries every pending flush for `studentId`; resolves with the number of items still unsent. */
+export async function flushPendingLocalWork(studentId: string): Promise<number> {
+  let remaining = 0
+  for (const work of listPendingLocalWork(studentId)) {
+    try {
+      remaining += await work.flush()
+    } catch (error) {
+      console.warn('[speaklab] pending work flush failed', error)
+      remaining += work.count
+    }
+  }
+  return remaining
 }
 
 function purgeStorage(storage: Storage | undefined): string[] {
