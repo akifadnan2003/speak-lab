@@ -315,6 +315,33 @@ test('vocabulary answers follow the account, queue offline with a visible warnin
   await expect.poll(async () => (await admin.from('vocabulary_reviews').select('id').eq('student_id', studentId)).data?.length, { timeout: 30_000 }).toBe(1)
 
   // Offline: the next answer stays on the device and the learner is told so.
+  await student.evaluate(() => {
+    const proto = Object.getPrototypeOf(window.localStorage) as Storage
+    const set = proto.setItem
+    const remove = proto.removeItem
+    proto.setItem = function (k: string, v: string) {
+      console.log(`storage set ${k} (${v.length})`)
+      return set.call(this, k, v)
+    }
+    proto.removeItem = function (k: string) {
+      console.log(`storage remove ${k} ${new Error().stack?.split('
+').slice(1, 4).join(' | ')}`)
+      return remove.call(this, k)
+    }
+    window.addEventListener('unhandledrejection', (e) => console.log(`unhandledrejection ${String((e.reason as Error)?.message ?? e.reason)}`))
+    const f = window.fetch
+    window.fetch = async (...args) => {
+      const url = String(args[0] instanceof Request ? args[0].url : args[0])
+      try {
+        const r = await f(...args)
+        console.log(`fetch ${r.status} ${url}`)
+        return r
+      } catch (e) {
+        console.log(`fetch FAIL ${url} ${(e as Error).message}`)
+        throw e
+      }
+    }
+  })
   await device1.setOffline(true)
   await student.getByRole('button', { name: 'Flip' }).click()
   await expect(student.getByTestId('flashcard-back')).toBeVisible()
@@ -323,10 +350,10 @@ test('vocabulary answers follow the account, queue offline with a visible warnin
   await student.waitForTimeout(3_000)
   const diagnostics = async () =>
     JSON.stringify({
-      outbox: await student.evaluate(() => Object.entries(localStorage).filter(([k]) => k.startsWith('speaklab.vocab'))),
+      storage: await student.evaluate(() => Object.keys(localStorage)),
       onLine: await student.evaluate(() => navigator.onLine),
       reviewsOnServer: (await admin.from('vocabulary_reviews').select('id').eq('student_id', studentId)).data?.length,
-      logs: logs.slice(-30),
+      logs: logs.slice(-60),
     })
   await expect(student.getByTestId('vocab-pending-sync'), await diagnostics()).toHaveAttribute('data-count', '1', { timeout: 15_000 })
 
