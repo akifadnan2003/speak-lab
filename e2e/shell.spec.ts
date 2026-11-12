@@ -91,6 +91,21 @@ test.describe('student navigation', () => {
     await expect(page.getByTestId('exercise-feedback')).toHaveAttribute('data-outcome', 'correct')
   })
 
+  test('vocabulary flashcard session works by keyboard and updates the dashboard', async ({ page }) => {
+    await setRole(page, 'student')
+    await page.goto('./#/vocabulary')
+    await expect(page.getByRole('heading', { name: 'Words and phrases' })).toBeVisible()
+    await page.getByTestId('start-session').click()
+    await expect(page.getByRole('heading', { name: 'Flashcards' })).toBeVisible()
+    await page.getByRole('button', { name: 'Flip' }).focus()
+    await page.keyboard.press('Enter')
+    await expect(page.getByTestId('flashcard-back')).toBeVisible()
+    await page.getByRole('button', { name: /Good/ }).click()
+    await expect(page.getByText('2 of 10')).toBeVisible()
+    await page.goto('./#/vocabulary')
+    await expect(page.getByTestId('vocab-stats')).toContainText('1 reviews today')
+  })
+
   test('student cannot reach tutor routes', async ({ page }) => {
     await setRole(page, 'student')
     await page.goto('./#/tutor')
