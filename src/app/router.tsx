@@ -36,6 +36,9 @@ const SpeakSessionPage = lazy(() =>
 const VocabularyPage = lazy(() =>
   import('@/features/vocabulary/VocabularyPage').then((m) => ({ default: m.VocabularyPage })),
 )
+const VocabularyPracticePage = lazy(() =>
+  import('@/features/vocabulary/VocabularyPracticePage').then((m) => ({ default: m.VocabularyPracticePage })),
+)
 const ProgressPage = lazy(() => import('@/features/progress/ProgressPage').then((m) => ({ default: m.ProgressPage })))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const MyStudentsPage = lazy(() => import('@/features/tutor/MyStudentsPage').then((m) => ({ default: m.MyStudentsPage })))
@@ -95,6 +98,7 @@ export const routes: RouteObject[] = [
                   { path: '/speak', element: <SpeakPage /> },
                   { path: '/speak/:modeId', element: <SpeakSessionPage /> },
                   { path: '/vocabulary', element: <VocabularyPage /> },
+                  { path: '/vocabulary/practice/:modeId', element: <VocabularyPracticePage /> },
                   { path: '/progress', element: <ProgressPage /> },
                 ],
               },

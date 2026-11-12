@@ -1,5 +1,5 @@
 import { LogOut, Menu, Settings, User } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
 import { Avatar } from '@/components/ui/avatar'
@@ -14,16 +14,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { useAuth } from '@/features/auth/AuthProvider'
+import { useGuardedSignOut } from '@/features/auth/SignOutGuard'
 import type { AuthUser } from '@/features/auth/types'
 import { Brand } from './Brand'
 import { SidebarNav } from './Sidebar'
 
 function UserMenu({ user }: { user: AuthUser }) {
-  const { signOut } = useAuth()
   const navigate = useNavigate()
+  const afterSignOut = useCallback(() => navigate('/login', { replace: true }), [navigate])
+  // Warns first when answers recorded on this device have not reached the account yet.
+  const { requestSignOut, dialog } = useGuardedSignOut(afterSignOut)
   return (
-    <DropdownMenu>
+    <>
+      <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -51,15 +54,13 @@ function UserMenu({ user }: { user: AuthUser }) {
           <Settings aria-hidden /> Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() => {
-            void signOut().then(() => navigate('/login', { replace: true }))
-          }}
-        >
+        <DropdownMenuItem onSelect={requestSignOut}>
           <LogOut aria-hidden /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+      {dialog}
+    </>
   )
 }
 

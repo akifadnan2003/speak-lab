@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { activateLocalUser, clearLocalStudentData, deactivateLocalUser, registerLocalDataCleaner } from './local-data'
+import {
+  activateLocalUser,
+  clearLocalStudentData,
+  deactivateLocalUser,
+  flushPendingLocalWork,
+  listPendingLocalWork,
+  registerLocalDataCleaner,
+  registerPendingLocalWork,
+} from './local-data'
 
 describe('clearLocalStudentData', () => {
   beforeEach(() => {
@@ -73,5 +81,43 @@ describe('activateLocalUser (shared devices)', () => {
     await activateLocalUser('user-a')
     deactivateLocalUser()
     expect(localStorage.getItem('speaklab.active-user')).toBeNull()
+  })
+})
+
+describe('pending local work (queued answers that have not reached the server)', () => {
+  it('lists only reporters with something queued for that student, and tolerates a broken reporter', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const unregisters = [
+      registerPendingLocalWork((id) => ({ label: 'vocabulary answers', count: id === 'a' ? 2 : 0, flush: async () => 0 })),
+      registerPendingLocalWork(() => null),
+      registerPendingLocalWork(() => {
+        throw new Error('boom')
+      }),
+    ]
+    expect(listPendingLocalWork('a').map((w) => [w.label, w.count])).toEqual([['vocabulary answers', 2]])
+    expect(listPendingLocalWork('b')).toEqual([])
+    for (const u of unregisters) u()
+    expect(listPendingLocalWork('a')).toEqual([])
+    warn.mockRestore()
+  })
+
+  it('flushes every pending item and reports what is still unsent, counting a failed flush as unsent', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const flushed = vi.fn(async () => 1)
+    const unregisters = [
+      registerPendingLocalWork(() => ({ label: 'vocabulary answers', count: 3, flush: flushed })),
+      registerPendingLocalWork(() => ({
+        label: 'drafts',
+        count: 2,
+        flush: async () => {
+          throw new Error('offline')
+        },
+      })),
+    ]
+    expect(await flushPendingLocalWork('a')).toBe(3)
+    expect(flushed).toHaveBeenCalledTimes(1)
+    for (const u of unregisters) u()
+    expect(await flushPendingLocalWork('a')).toBe(0)
+    warn.mockRestore()
   })
 })

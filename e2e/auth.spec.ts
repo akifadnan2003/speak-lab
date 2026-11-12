@@ -282,3 +282,83 @@ test('student learns on this device, progress follows the account to another dev
   await expect(again.getByRole('heading', { name: /Past Continuous/ })).toBeVisible()
   await device2.close()
 })
+
+test('vocabulary answers follow the account, queue offline with a visible warning, and can be synced before signing out', async ({ browser }) => {
+  test.setTimeout(180_000)
+  const email = uniqueEmail('e2e-vocab')
+  const created = await admin.auth.admin.createUser({ email, password: STUDENT_PASSWORD, email_confirm: true, user_metadata: { full_name: 'Leyla Test' } })
+  const studentId = created.data.user!.id
+  createdUsers.push(studentId)
+  await admin.from('tutor_students').insert({ tutor_id: tutor.id, student_id: studentId })
+  await admin.from('profiles').update({ onboarding_completed_at: new Date().toISOString() }).eq('id', studentId)
+
+  // Device 1, online: one flashcard answer reaches the account straight away. Service workers are
+  // blocked in this context because Chromium's offline emulation does not apply to requests that
+  // pass through one, so the later "offline" step would still reach the server.
+  const device1 = await browser.newContext({ serviceWorkers: 'block' })
+  const student = await device1.newPage()
+  const logs: string[] = []
+  student.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`))
+  student.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`))
+  await login(student, email, STUDENT_PASSWORD)
+  await expect(student).toHaveURL(/#\/$/)
+  await student.goto('./#/vocabulary')
+  await expect(student.getByRole('heading', { name: 'Words and phrases' })).toBeVisible({ timeout: 30_000 })
+  await expect(student.getByTestId('vocab-storage-label')).toHaveText('Saved to your account')
+  await expect(student.getByTestId('vocab-pending-sync')).toHaveCount(0)
+  await student.getByTestId('start-session').click()
+  await expect(student.getByRole('heading', { name: 'Flashcards' })).toBeVisible()
+  await student.getByRole('button', { name: 'Flip' }).click()
+  await expect(student.getByTestId('flashcard-back')).toBeVisible()
+  await student.getByRole('button', { name: /Good/ }).click()
+  await expect(student.getByText('2 of 10')).toBeVisible()
+  await expect.poll(async () => (await admin.from('vocabulary_reviews').select('id').eq('student_id', studentId)).data?.length, { timeout: 30_000 }).toBe(1)
+
+  // Offline: the next answer stays on the device and the learner is told so.
+  await device1.setOffline(true)
+  await student.getByRole('button', { name: 'Flip' }).click()
+  await expect(student.getByTestId('flashcard-back')).toBeVisible()
+  await student.getByRole('button', { name: /Good/ }).click()
+  await expect(student.getByText('3 of 10')).toBeVisible()
+  await expect(student.getByTestId('vocab-pending-sync'), `console: ${logs.join(' // ')}`).toHaveAttribute('data-count', '1', { timeout: 15_000 })
+
+  // Signing out now would delete the queued answer, so the app warns first.
+  await student.getByTestId('user-menu').click()
+  await student.getByRole('menuitem', { name: 'Sign out' }).click()
+  await expect(student.getByTestId('sign-out-guard')).toHaveAttribute('data-phase', 'pending')
+  await expect(student.getByTestId('sign-out-guard')).toContainText('1 vocabulary answers is still waiting on this device')
+  await student.getByTestId('sign-out-stay').click()
+  await expect(student.getByTestId('sign-out-guard')).toHaveCount(0)
+  await expect(student.getByRole('heading', { name: 'Flashcards' })).toBeVisible()
+
+  // "Sync and sign out" while still offline cannot send anything: the dialog says so and keeps
+  // the session instead of discarding the answer.
+  await student.getByTestId('user-menu').click()
+  await student.getByRole('menuitem', { name: 'Sign out' }).click()
+  await student.getByTestId('sign-out-sync').click()
+  await expect(student.getByTestId('sign-out-guard')).toHaveAttribute('data-phase', 'failed', { timeout: 30_000 })
+  await expect(student.getByTestId('sign-out-guard')).toContainText('1 could not be sent')
+  await expect(student).not.toHaveURL(/#\/login$/)
+
+  // Back online, "Try again" sends the answer and signs out. (The repository also flushes on the
+  // browser's own `online` event; either way nothing is left to send and sign-out completes.)
+  await device1.setOffline(false)
+  await student.getByTestId('sign-out-sync').click()
+  await expect(student).toHaveURL(/#\/login$/, { timeout: 30_000 })
+  expect((await admin.from('vocabulary_reviews').select('id').eq('student_id', studentId)).data).toHaveLength(2)
+  expect(await student.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('speaklab.vocab')))).toEqual([])
+  await device1.close()
+
+  // Device 2: the same account sees both answers; nothing was needed from device 1.
+  const device2 = await browser.newContext()
+  const again = await device2.newPage()
+  await login(again, email, STUDENT_PASSWORD)
+  await expect(again).toHaveURL(/#\/$/)
+  await again.goto('./#/vocabulary')
+  await expect(again.getByTestId('vocab-stats')).toContainText('2 reviews today', { timeout: 30_000 })
+  await expect(again.getByTestId('vocab-pending-sync')).toHaveCount(0)
+  await device2.close()
+
+  const words = await admin.from('student_vocabulary').select('student_id').eq('student_id', studentId)
+  expect(words.data).toHaveLength(2)
+})

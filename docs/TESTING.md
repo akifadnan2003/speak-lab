@@ -1,6 +1,6 @@
 # SpeakLab — Testing Strategy
 
-Last updated for milestone M3 integration (2026-11-11).
+Last updated for milestone M4 integration (2026-11-12).
 
 ## 1. Layers
 
@@ -11,6 +11,7 @@ Last updated for milestone M3 integration (2026-11-11).
 | Unit / integration | Vitest 5 + Testing Library + jsdom | `src/**/*.test.ts(x)` | local, CI |
 | End-to-end (shell) | Playwright 1.64, Chromium desktop + Pixel 7, **preview build** | `e2e/shell.spec.ts` | local, CI |
 | Authorization, lifecycle & learning records | Vitest (node) against a **local Supabase stack** (Postgres + RLS, GoTrue, Edge Functions, Mailpit) | `supabase/tests/*.test.ts` | CI (`database` job); local with Docker |
+| Migrations, grants and RLS without Docker | Vitest (node) against **PGlite** (real Postgres 17 in WebAssembly, all migrations, `anon`/`authenticated`/`service_role` + JWT claims) | `supabase/tests/pglite/*.test.ts` | local (`npm run test:db:pglite`), CI (`database` job, part of `test:db`) |
 | End-to-end (real auth) | Playwright against the production bundle built for the **local Supabase stack**; real emails from Mailpit | `e2e/auth.spec.ts` | CI (`database` job); local with Docker |
 | Manual device pass | Real iPhone Safari, Android Chrome, Windows Edge/Chrome/Firefox | checklist below | each milestone |
 
@@ -21,7 +22,8 @@ npm run typecheck
 npm run lint
 npm run test              # vitest run (jsdom)
 npm run test:e2e          # builds with VITE_UI_PREVIEW=true, serves /speak-lab/, Playwright shell suite
-npm run check             # typecheck + lint + test + build
+npm run check             # typecheck + lint + sync check + test + build
+npm run test:db:pglite    # migrations + RLS against PGlite, no Docker needed
 
 # Needs Docker:
 npx supabase start        # local stack with migrations, Edge Function and Mailpit
@@ -72,6 +74,21 @@ CI); bump it on purpose with a green `database` job, not through `latest`.
 | Mobile and desktop lesson navigation | `auth.spec.ts` runs on Desktop Chrome and Pixel 7 projects; `shell.spec.ts` preview build |
 | Shared function code in sync | `npm run sync:functions:check` in CI |
 
+## 3c. M4 integration coverage
+
+| Requirement | Where it is proven |
+| --- | --- |
+| Per-student vocabulary isolation | `pglite/vocabulary-rls.test.ts` (own rows only, tutor read of linked students, disabled accounts refused); `vocabulary-rls.test.ts` (full stack: GoTrue JWTs through PostgREST, anon sees nothing); `auth.spec.ts` device 2 |
+| Server-owned schedule | `pglite/vocabulary-rls.test.ts` (direct writes refused even on own rows, quality/interval/stage derived server-side); `scheduler.sql-parity.test.ts` (TS scheduler ≡ SQL scheduler over 40 sequences, mastery, lapses, DST); `cloud.test.ts` "never sends client-computed quality" |
+| Idempotency and ordering | `pglite/vocabulary-rls.test.ts` (duplicate id, older-than-state, before-reset, clock sanity); `vocabulary-rls.test.ts` (same id concurrently from two sessions applied once); `cloud.test.ts` |
+| Offline queue, retry, cross-device restore | `cloud.test.ts`, `outbox.test.ts` (durable queue, reload, backoff, fallback to last server copy, account-switch race); `auth.spec.ts` (offline answer queued, synced, visible on device 2) |
+| Pending-sync indicator | `PendingSyncBadge.test.tsx`, `cloud.test.ts` "queue notifications", `VocabularyProvider.offline.test.tsx` (TanStack network mode); `auth.spec.ts` badge count while offline |
+| Guarded sign-out | `SignOutGuard.test.tsx` (direct sign-out when empty, warn, sync then sign out, failed flush → retry/discard, no user); `local-data.test.ts` pending-work registry; `auth.spec.ts` stay, failed sync offline, Try again online |
+| Cleanup on sign-out / account switch | `cleanup.test.ts` (through M2's real `clearLocalStudentData()` and `activateLocalUser()`); `auth.spec.ts` no `speaklab.vocab*` keys after sign-out |
+| Consented local-to-cloud import | `cloud-import.test.ts`, `LocalImportCard.test.tsx` (plan first, upload only on consent, preview and foreign records refused) |
+| Bank mirror in sync | `bank-seed.test.ts` (generated seed migration equals `bank.ts`) |
+| Vocabulary never feeds assessments | `assessment-isolation.test.ts` |
+
 ## 4. What is covered today
 
 Unit / integration (175 tests): utils, env (incl. preview refusal when configured), theme store,
@@ -101,13 +118,36 @@ Unit / integration added by M3 (71 tests, total 113):
   with locked assessment, locked lesson refusal, lesson run persisting attempts/progress to
   localStorage, Azerbaijani switch, completed lesson reflected in the chapter view.
 
-End-to-end (34 tests across two projects):
+Unit / integration added by M4 (56 tests, total 171):
+
+- `vocabulary/schema`: defaults, full shape, unknown language/topic rejection, duplicate ids and
+  term+POS, first-example rule with inflections, empty bank.
+- `vocabulary/srs/scheduler`: quality mapping, learning steps and ease growth, mastery only via
+  recall, lapses and ease floor, "hard" cap, spoken counter, determinism; `time`: date keys across
+  UTC / Baku / Los Angeles, overdue-vs-due by zone, calendar day arithmetic.
+- `vocabulary/revision/queue`: bucket order and determinism, single appearance, new-word cap and
+  limit, recently-incorrect window, empty bank, time-zone overdue.
+- `vocabulary/stats`: stage counts, due/overdue, levels, difficult, recent, recommendation, streaks
+  by zone, empty bank.
+- `vocabulary/persistence` + `migration`: memory and localStorage repositories, per-student
+  namespacing, idempotent reviews, clear vs clear-all, corrupted storage, snapshot refuses preview ids.
+- `vocabulary/modes`: bank coverage (≥170 entries, 13 topics, all blankable), registry, `blankOut`,
+  deterministic distractors, each builder graded through the M3 engine.
+- `vocabulary/components`: Flashcard keyboard flip/grade and hidden translation, ActiveRecall hint
+  and reveal, VocabularySession for flashcards / meaning choice / matching / missing word including
+  queue snapshotting mid-session.
+- `vocabulary/VocabularyPage`: zeroed stats for a new student, word browser filters and translation
+  switch, mode list with honest unavailability, practice run persisting under the student id, reset
+  with confirmation, unavailable-mode refusal.
+
+End-to-end (36 tests across two projects):
 
 - Base path, manifest (`start_url`, `scope`, `display`), service worker reachable.
 - Deep hash route direct navigation and refresh (`/learn/a0-01`).
 - Preview banner visible.
 - Student navigation through bottom bar (mobile) / sidebar (desktop).
 - Real lesson exercise operable by keyboard; progress survives navigation; sentence ordering by tap.
+- Vocabulary flashcard session by keyboard; dashboard reflects the review.
 - Student cannot reach `/tutor`.
 - Tutor cards open profile; tab routing; grammar table.
 - Invite dialog validation and Escape.
@@ -117,8 +157,15 @@ End-to-end (34 tests across two projects):
 Shell e2e (32 tests, two projects): unchanged from M1 (manifest, deep links, navigation,
 exercise keyboard use, role isolation, dialogs, theme, overflow at 7 widths).
 
-Database + real-auth (CI `database` job): 21 + 10 integration tests (`auth-rls.test.ts`,
-`progress.test.ts`) and 6 browser scenarios (12 test runs across the desktop and Pixel 7 projects).
+Unit / integration added by the M4 integration (total 306): `persistence/api`, `outbox`, `cloud`,
+`wire`, `cleanup`, `cloud-import`, `LocalImportCard`, `PendingSyncBadge`, `scheduler.sql-parity`
+(PGlite), `bank-seed`, `assessment-isolation`, `auth/SignOutGuard`, `lib/local-data` pending work,
+`VocabularyProvider.offline` (saving runs while `navigator.onLine` is false).
+
+Database + real-auth (CI `database` job): 21 + 10 + 7 integration tests against the local stack
+(`auth-rls.test.ts`, `progress.test.ts`, `vocabulary-rls.test.ts`), 22 PGlite tests
+(`pglite/vocabulary-rls.test.ts`, also runnable without Docker) and 7 browser scenarios (14 test
+runs across the desktop and Pixel 7 projects).
 
 ## 5. Conventions
 

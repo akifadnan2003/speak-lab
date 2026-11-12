@@ -36,6 +36,13 @@ Supabase operations (setup, bootstrap, deploy, rollback): `docs/SUPABASE_SETUP.m
   account switching purge it.
 - Chapter checks are graded only by the `assessment` Edge Function; `assessment_attempts` is never
   written by clients and clients never submit scores. Practice progress is the learner's own rows.
+- Vocabulary progress is server-owned: clients have SELECT only on the vocabulary tables and submit
+  answers through `record_vocabulary_reviews`; the schedule is computed in SQL. Vocabulary is
+  formative practice and never feeds an assessment. The bank is mirrored by a generated migration
+  (`*_vocabulary_bank_v<n>.sql`, `bank-seed.test.ts`); never edit an applied seed.
+- Work queued on the device for the server (offline vocabulary answers) is registered with
+  `registerPendingLocalWork()` in `src/lib/local-data.ts`, shown to the learner while pending, and
+  offered an explicit sync in the sign-out dialog (`useGuardedSignOut`). The purge still runs.
 - Two generated artefacts, never edited by hand, regenerated with `npm run sync` after changing
   schemas, content, the grading engine, progression or `assessment-rules.ts` (CI checks both):
   `supabase/functions/_shared/features/**` (the Edge Function's copy) and
@@ -60,6 +67,9 @@ Never claim a check passed without running it. Never delete a meaningful test to
   Exercise grading and progression rules are pure functions in `src/features/exercises/engine/` and
   `src/features/curriculum/progression.ts`; screens talk to persistence only through
   `src/features/curriculum/ports.ts`.
+- Vocabulary follows the same split: entries in `src/features/vocabulary/content/bank.ts` (validated
+  by `schema.ts`), pure scheduler/queue/stats in `srs/`, `revision/`, `stats.ts`, persistence behind
+  `src/features/vocabulary/ports.ts`. Support-language text is optional and keyed by language.
 - UI primitives in `src/components/ui/` follow the shadcn pattern (Radix + `cva` + `cn`).
 - Styling: Tailwind 4 utilities bound to semantic tokens (`bg-surface`, `text-fg-muted`,
   `border-line`, `bg-primary`, status `*-soft` colours). Do not hard-code hex colours in components.

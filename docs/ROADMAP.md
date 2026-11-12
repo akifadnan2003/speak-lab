@@ -1,6 +1,6 @@
 # SpeakLab — Roadmap and Milestones
 
-Last updated 2026-11-11. Status legend: ✅ done · 🔄 in progress · ⏳ planned.
+Last updated 2026-11-12. Status legend: ✅ done · 🔄 in progress · ⏳ planned.
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
@@ -8,7 +8,7 @@ Last updated 2026-11-11. Status legend: ✅ done · 🔄 in progress · ⏳ plan
 | M1 | Application foundation and design system | ✅ |
 | M2 | Authentication, authorization and student invitations | ✅ (live in production 2026-11-11) |
 | M3 | Curriculum and exercise engine | 🔄 integration built on `m3-integration`, PR open |
-| M4 | Vocabulary and revision | ⏳ |
+| M4 | Vocabulary and revision | 🔄 integration built on `m4-integration`, PR open |
 | M5 | Student progress | ⏳ |
 | M6 | Tutor dashboard | ⏳ |
 | M7 | AI speaking | ⏳ |
@@ -118,10 +118,55 @@ Remaining for M3 after this integration:
 - Further chapters (A0-02 onward) authored with the same schemas.
 - Versioned `lesson_content` tables and the tutor content editor (M6).
 
-## M4 — Vocabulary and Revision ⏳
+## M4 — Vocabulary and Intelligent Revision 🔄
 
-Vocabulary bank import, student vocabulary states, SM-2 style scheduler, review queue, six
-practice modes, mistake history, recognition vs recall vs spoken-use tracking.
+Design: `docs/superpowers/specs/2026-11-03-m4-vocabulary-design.md`. Branch `worktree-m4-vocabulary`.
+
+Done (frontend-independent slice):
+
+- [x] `VocabularyEntrySchema` (word/expression, part of speech, definition, examples, support-language
+      translations keyed by language, pronunciation incl. optional audio URL, synonyms, antonyms,
+      collocations, word family, grammar note, level, topics, tags, chapter links) and bank-level
+      validation (unique ids, unique term+POS, first example contains the term)
+- [x] A0–A2 bank: 180 validated entries across 13 topics, all with Azerbaijani translations
+- [x] SM-2-style scheduler (documented adaptations: 1/3/6-day learning steps, mastery through
+      active recall, lapse tracking), recognition / recall / spoken counters, time-zone-aware days
+- [x] Deterministic revision queue: overdue → recently incorrect → weak recall → current chapter →
+      mastered reinforcement → due → capped new words
+- [x] Six working modes (flashcards, choose the meaning, matching, missing word, sentence
+      completion, active recall) reusing the M3 exercise renderer; listening and speaking registered
+      as unavailable with reasons
+- [x] Dashboard computed from stored records only (learned, new, due/overdue, mastered, streak,
+      by level, difficult, recently learned, recommended session), word browser with filters and a
+      translation switch, device reset with confirmation
+- [x] Ports + memory/localStorage repositories namespaced per student, `clearStoredVocabulary()`
+      for sign-out, explicit snapshot export that refuses preview ids
+- [x] 56 new tests (171 total); e2e flashcard flow
+
+Integration onto the authenticated foundation (branch `m4-integration`, 2026-11-12; design and
+evidence in `docs/VOCABULARY_PERSISTENCE.md`, ADR-018, ADR-019):
+
+- [x] `worktree-m4-vocabulary` merged unchanged onto the M3 integration (router, roadmap and ADR
+      numbering resolved; M4's vocabulary ADR is ADR-017), then the preparation commits
+      `9bf65d7..m4-integration-prep` replayed without the scaffolding merge
+- [x] Migrations `20261111160800_vocabulary_persistence.sql` (tables, RLS, `record_vocabulary_reviews`,
+      `reset_vocabulary_progress`, SQL scheduler) and `20261111160900_vocabulary_bank_v1.sql`
+      (generated bank mirror, 180 entries); both newer than every applied migration
+- [x] Server-owned schedule: clients SELECT only, answers submitted through the RPC, quality and
+      schedule derived on the server, per-student RLS, tutor read of linked students
+- [x] Cloud repository with durable per-account outbox, retry/backoff, optimistic overlay, offline
+      fallback to the last server copy, cross-device restore, consented local-to-cloud import
+- [x] Visible pending-sync indicator on the dashboard and practice screens; sign-out guard that
+      warns about queued answers and offers an explicit sync before the device purge
+- [x] Cleanup wired to M2: `speaklab.vocab.*` keys purged, repository caches and timers disposed on
+      sign-out and account switch
+- [x] Vocabulary results never reach assessments (`assessment-isolation.test.ts`)
+- [x] Tests: 306 unit (PGlite scheduler parity, outbox, cloud repository, import, cleanup, badge,
+      sign-out guard), 22 PGlite RLS tests, 7 full-stack RLS tests, real-auth browser scenario
+      (online answer, offline queue + warning, guarded sign-out, device 2 restore)
+
+Remaining for M4: audio assets + listening mode, spoken-use mode (M7), tutor assignment of word sets
+and a tutor view of `student_vocabulary` (M6), parameter tuning from real review data.
 
 ## M5 — Student Progress ⏳
 
