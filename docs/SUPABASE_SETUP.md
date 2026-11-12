@@ -204,6 +204,8 @@ For `npm run dev` against the local stack put the values from `supabase status` 
 - [ ] Custom SMTP configured and verified (section 1.3).
 - [ ] Invite and Reset-password templates replaced (section 1.4).
 - [ ] Manual backend workflow run successfully (migrations applied, both functions deployed).
+      After the M6 merge the plan must list `20261112200000_tutor_workspace`; afterwards
+      `select count(*) from public.assignments` runs for the tutor and returns 0 until homework is set.
       After the M4 merge the plan must list `20261111160800_vocabulary_persistence` and
       `20261111160900_vocabulary_bank_v1` (and `20261111150000_curriculum_progress` if M3 was not
       applied yet); `select count(*) from public.vocabulary_items` returns 180 afterwards.

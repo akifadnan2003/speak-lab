@@ -26,6 +26,8 @@ endpoints, a revoked student with a still-open session.
 | Assessments are graded server-side | `assessment_attempts` is written only by the `assessment` Edge Function (service role); clients have SELECT. The function verifies the caller, recomputes the chapter gate from the database, grades raw answers with the shared engine copy, enforces 3 attempts per chapter version and a 2 h attempt expiry, and discloses correct answers only after a pass or on the last attempt. Chapter completion requires a passed attempt, so no client write completes a chapter. Real builds ship a generated curriculum with assessment answer keys removed (`npm run sync:content`); the full content exists only in preview builds and in the function's copy. |
 | The vocabulary schedule is server-owned | Clients have SELECT only on the four vocabulary tables. Answers are submitted through `record_vocabulary_reviews` (`security definer`, student from `auth.uid()`, active students only), which derives quality and runs the SQL scheduler; `reset_vocabulary_progress` is the only other write. Client-sent schedule fields and student ids are ignored, and a queue written under another account is refused (`p_expected_student`). Vocabulary is formative practice and never feeds an assessment (`assessment-isolation.test.ts`). |
 | Queued work is never lost silently | Answers recorded offline stay in a per-account outbox and are shown as "not reached your account yet". Sign-out warns about them and offers an explicit sync first; the flush only sends the signed-in account's queue and the device purge still runs afterwards (ADR-019). |
+| Homework status cannot be forged | Every assignment and submission transition and timestamp is set by triggers; students may change only their own draft text and submit it. Lesson and vocabulary homework is completed only by `complete_assignment`, which verifies `lesson_progress`, a passed server-graded `assessment_attempts` row, or `vocabulary_reviews` recorded after publication. Feedback is written only by the owning tutor; students can read it, never edit it. No numeric grades exist outside chapter checks. |
+| Teacher notes are private | `teacher_notes` has policies for the tutor only (own notes about linked students). A student receives no rows and cannot insert, update or delete, through the app or the Data API. Note bodies are never written to `account_events`. |
 | Progress analytics are read-only and student-scoped | M5 computes every progress metric in the browser from rows the account can already read under RLS (own rows for students, linked students for the tutor). No new table, view, RPC or grant; nothing is written back; caches are TanStack queries under `['student', <id>, …]` cleared on sign-out and account switch. Vocabulary practice never feeds a chapter check (ADR-018). |
 | Nothing of a student stays on a shared device | `src/lib/local-data.ts`: sign-out, the SIGNED_OUT event and a change of the active user id purge every `speaklab.*` storage key except the theme and the auth session, run registered feature cleaners (M3 registers `clearStoredProgress`), delete `speaklab*` IndexedDB databases and clear the TanStack Query cache. The profile query of a new user waits for this purge. |
 
@@ -49,6 +51,9 @@ Helper functions (`SECURITY DEFINER`, `STABLE`, `search_path = ''`, executable b
 | `student_vocabulary` (M4) | own rows; tutor → linked students | never | never from clients (`record_vocabulary_reviews` / `reset_vocabulary_progress`, `security definer`) |
 | `vocabulary_reviews` (M4) | own rows; tutor → linked students | never | never from clients (same functions; reviews are voided, never deleted) |
 | `vocabulary_student_meta` (M4) | own rows; tutor → linked students | never | never from clients |
+| `assignments` (M6) | student: published/cancelled ones addressed to them; tutor: own | tutor: own (trigger: transitions, immutability after publish) | tutor INSERT own; DELETE own drafts only |
+| `assignment_recipients` (M6) | own row; tutor: own assignments | student: own `draft_text` + submit (trigger); tutor: `feedback` + review/return (trigger) | tutor INSERT for linked students; DELETE only on drafts |
+| `teacher_notes` (M6) | tutor only | tutor only | tutor only; students have no policy |
 
 `bootstrap_owner(uuid)`: refuses client callers, requires an existing **confirmed** Auth user,
 returns `already-owner` for the existing tutor, raises for any other id when a tutor exists.
@@ -126,6 +131,8 @@ answer key. Every submission and reset is logged in `account_events`.
    from the submitted flags, so a modified client could submit unearned "correct" answers for its
    own account. Acceptable for formative self-practice: the tutor sees every answer with server
    receive times, and vocabulary progress never counts towards an assessment (ADR-018).
+11. **Written homework is read by a person.** There is no automated grading; the tutor's feedback
+    is prose. Practice-lesson completion used as homework evidence is self-reported (limitation 6).
 10. **Discarding queued answers is possible.** A learner who chooses *Sign out and discard* (or
     whose device is purged by a different account signing in) loses answers that never reached the
     server. The pending-sync badge and the sign-out dialog make this explicit (ADR-019).

@@ -304,3 +304,24 @@ the records; the tutor and the student see the same figures. Cost grows with one
 history (fine for a one-tutor academy); server-side aggregation can be added later behind the
 same `LearningRecords` shape if histories grow. Time on task, speaking and writing scores and
 listening remain unmeasured until the data to measure them exists.
+
+## ADR-022 · Homework lifecycle lives in the database; completion needs evidence (2026-11-12)
+
+**Context.** M6 adds homework, submissions, feedback and private notes to a product with one tutor
+and real students. A modified client must not be able to mark work complete, write its own
+feedback, read another learner's work or read the tutor's notes; and the tutor must not be able
+to alter what a student wrote.
+**Decision.** Three tables (`assignments`, `assignment_recipients`, `teacher_notes`), RLS for
+who may see which rows, and `BEFORE` triggers that decide which columns each actor may change and
+which status transitions are legal, setting every timestamp from the server clock. Lesson and
+vocabulary homework is completed only by `complete_assignment`, a `security definer` function
+that checks the learner's own records (`lesson_progress`, a passed server-graded chapter check,
+or `vocabulary_reviews` after publication) and stores the evidence; written homework is
+submitted by the student and reviewed by the tutor, with optional "return for changes" and
+resubmission. Teacher notes have no student-facing policy at all. No Edge Function was needed:
+PostgREST plus triggers and one RPC cover every operation, and the service role is recognised
+only through verified JWT claims. Numeric grades exist only for chapter checks.
+**Consequences.** The client contains no authorization logic; the same rules hold for the app,
+curl and the dashboard. Tutor edits stop once anything is submitted (cancel and reassign
+instead). Practice-lesson evidence is self-reported, as all practice progress is. Adding a second
+tutor later needs only the existing link table. Notifications and attachments are out of scope.
