@@ -25,11 +25,12 @@ import { formatRelative } from '@/lib/utils'
 import { ACCOUNT_STATUS_LABEL, StudentAdminError, useStudent, useStudentAdmin, useStudentEvents, type AccountEvent, type StudentAccount } from './api'
 import { DemoStudentSections } from './DemoStudentSections'
 import { StudentCurriculumSection } from './StudentCurriculumSection'
+import { StudentProgressSection } from './StudentProgressSection'
 
 const SECTIONS = [
   'overview',
   'curriculum',
-  'grammar',
+  'progress',
   'vocabulary',
   'speaking',
   'listening',
@@ -43,7 +44,7 @@ type Section = (typeof SECTIONS)[number]
 const SECTION_LABEL: Record<Section, string> = {
   overview: 'Overview',
   curriculum: 'Curriculum',
-  grammar: 'Grammar',
+  progress: 'Progress',
   vocabulary: 'Vocabulary',
   speaking: 'Speaking',
   listening: 'Listening',
@@ -54,8 +55,7 @@ const SECTION_LABEL: Record<Section, string> = {
 }
 
 /** Which milestone delivers each placeholder section (kept honest in the UI). */
-const SECTION_MILESTONE: Record<Exclude<Section, 'overview' | 'history' | 'curriculum'>, string> = {
-  grammar: 'M5 · Student progress',
+const SECTION_MILESTONE: Record<Exclude<Section, 'overview' | 'history' | 'curriculum' | 'progress'>, string> = {
   vocabulary: 'M4 · Vocabulary and revision',
   speaking: 'M7 · AI speaking',
   listening: 'M8 · Advanced learning',
@@ -170,6 +170,9 @@ export function StudentDetailPage() {
             </TabsContent>
             <TabsContent value="curriculum">
               <StudentCurriculumSection studentId={account.id} tutorId={tutorId} />
+            </TabsContent>
+            <TabsContent value="progress">
+              <StudentProgressSection studentId={account.id} />
             </TabsContent>
             <TabsContent value="history">
               <AccountHistory studentId={account.id} />

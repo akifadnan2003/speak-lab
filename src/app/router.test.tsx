@@ -85,19 +85,19 @@ describe('routing and guards (preview mode)', () => {
 
   it('renders the student dashboard with the preview banner', async () => {
     await renderAt('/')
-    expect(await screen.findByText(/recommended lesson/i)).toBeInTheDocument()
+    expect(await screen.findByTestId('continue-card')).toBeInTheDocument()
     expect(screen.getByTestId('preview-banner')).toBeInTheDocument()
   })
 
   it('keeps students out of tutor routes', async () => {
     const router = await renderAt('/tutor')
-    await screen.findByText(/recommended lesson/i)
+    await screen.findByTestId('continue-card')
     expect(router.state.location.pathname).toBe('/')
   })
 
   it('redirects signed-in users away from the login page', async () => {
     const router = await renderAt('/login')
-    await screen.findByText(/recommended lesson/i)
+    await screen.findByTestId('continue-card')
     expect(router.state.location.pathname).toBe('/')
   })
 

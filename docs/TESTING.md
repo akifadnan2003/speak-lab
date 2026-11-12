@@ -1,6 +1,6 @@
 # SpeakLab — Testing Strategy
 
-Last updated for milestone M4 integration (2026-11-12).
+Last updated for milestone M5 (2026-11-12).
 
 ## 1. Layers
 
@@ -89,6 +89,22 @@ CI); bump it on purpose with a green `database` job, not through `latest`.
 | Bank mirror in sync | `bank-seed.test.ts` (generated seed migration equals `bank.ts`) |
 | Vocabulary never feeds assessments | `assessment-isolation.test.ts` |
 
+## 3d. M5 coverage
+
+| Requirement | Where it is proven |
+| --- | --- |
+| Empty account, partial progress, completed lessons | `analytics/analytics.test.ts` (overview counts, empty state, level and placement); `ProgressPage.test.tsx` (empty state renders no invented numbers; seeded device records) |
+| Passed and failed chapter checks | `analytics.test.ts` (open/voided attempts ignored, chapter completed once, failed check as weak topic, perfect check) |
+| Repeated and duplicate attempts | `analytics.test.ts` (first-try accuracy ignores retries and earlier runs; duplicate rows count once in weekly activity) |
+| Vocabulary reviews and lapses | `analytics.test.ts` (accuracy and mastered share, lapses threshold, milestones de-duplicated, due words) |
+| Skill evidence thresholds | `analytics.test.ts` (minimum graded exercises / reviews, self-checked and no-content states) |
+| Weak-topic thresholds and next steps | `analytics.test.ts` |
+| Achievement rules | `analytics.test.ts` (first lesson, first pass, perfect, 50 reviews, scattered days do not earn the streak) |
+| Calendar and time-zone boundaries | `analytics.test.ts` (Baku vs UTC day assignment at midnight, seven-day window, streak through today/yesterday) |
+| Student and tutor authorization | Unchanged tables and policies: `progress.test.ts`, `vocabulary-rls.test.ts`, `pglite/vocabulary-rls.test.ts`; `auth.spec.ts` tutor Progress tab for a linked student |
+| Sign-out and account switching | Caches live under `['student', id, …]`; `AuthProvider.test.tsx` clears the query client; `auth.spec.ts` device 2 |
+| Desktop and mobile | `shell.spec.ts` progress scenario and overflow checks at 7 widths; `auth.spec.ts` on both projects |
+
 ## 4. What is covered today
 
 Unit / integration (175 tests): utils, env (incl. preview refusal when configured), theme store,
@@ -140,7 +156,7 @@ Unit / integration added by M4 (56 tests, total 171):
   switch, mode list with honest unavailability, practice run persisting under the student id, reset
   with confirmation, unavailable-mode refusal.
 
-End-to-end (36 tests across two projects):
+End-to-end (40 tests across two projects; set `PLAYWRIGHT_PORT` when 4173 is taken locally):
 
 - Root base path, manifest (`start_url`, `scope`, `id`, `display`), service worker reachable and free of
   `/speak-lab/`; the old project path is not served; `CNAME` ships with the build.
@@ -149,6 +165,7 @@ End-to-end (36 tests across two projects):
 - Student navigation through bottom bar (mobile) / sidebar (desktop).
 - Real lesson exercise operable by keyboard; progress survives navigation; sentence ordering by tap.
 - Vocabulary flashcard session by keyboard; dashboard reflects the review.
+- Progress page: honest empty state, then real records after one exercise; tutor Progress tab.
 - Student cannot reach `/tutor`.
 - Tutor cards open profile; tab routing; grammar table.
 - Invite dialog validation and Escape.
@@ -157,6 +174,9 @@ End-to-end (36 tests across two projects):
 
 Shell e2e (32 tests, two projects): unchanged from M1 (manifest, deep links, navigation,
 exercise keyboard use, role isolation, dialogs, theme, overflow at 7 widths).
+
+Unit / integration added by M5 (total 336): `progress/analytics` (27 tests over fixture records)
+and `progress/ProgressPage.test.tsx` (empty state, device records, home page).
 
 Unit / integration added by the M4 integration (total 306): `persistence/api`, `outbox`, `cloud`,
 `wire`, `cleanup`, `cloud-import`, `LocalImportCard`, `PendingSyncBadge`, `scheduler.sql-parity`

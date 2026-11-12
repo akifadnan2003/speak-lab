@@ -284,3 +284,23 @@ removed from both lists once no invitation or recovery link older than the OTP e
 Anything queued offline on the old origin cannot be flushed any more, because the old origin is
 no longer served; the migration runbook (`docs/CUSTOM_DOMAIN.md`) says how to check. No data in
 Supabase changes. Local development and the Playwright suites now run at `/` as well.
+
+## ADR-021 · Progress analytics are pure client functions over RLS-protected records (2026-11-12)
+
+**Context.** M5 replaces the last student-facing demo data with real progress: overview, weekly
+activity, skills, weak topics, timeline and achievements, for the student and read-only for the
+tutor. The architecture draft foresaw `skill_mastery`, `mistake_records` and `learning_activity`
+tables. Every input already exists in `lesson_progress`, `exercise_attempts`,
+`assessment_attempts`, `student_vocabulary` and `vocabulary_reviews`, all under RLS.
+**Decision.** No new schema. `src/features/progress/analytics/` holds pure, deterministic
+functions from `LearningRecords` to display models; `useLearningAnalytics` loads the records with
+the existing repositories (paged) and computes once per data change. Metric definitions live in
+`docs/PROGRESS_METRICS.md`: calendar days in the device time zone, first-try accuracy for graded
+exercises, server stages for vocabulary, explicit evidence thresholds, "Not assessed yet" instead
+of invented scores, stable ids for timeline entries and achievements. The tutor's Progress tab
+calls the same hook with a linked student's id; RLS decides what comes back.
+**Consequences.** Nothing to migrate or deploy on the backend; numbers can never disagree with
+the records; the tutor and the student see the same figures. Cost grows with one student's
+history (fine for a one-tutor academy); server-side aggregation can be added later behind the
+same `LearningRecords` shape if histories grow. Time on task, speaking and writing scores and
+listening remain unmeasured until the data to measure them exists.

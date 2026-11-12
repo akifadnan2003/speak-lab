@@ -98,7 +98,7 @@ export function DemoStudentSections({ profile }: { profile: DemoStudentProfile }
           </Card>
         </TabsContent>
 
-        <TabsContent value="grammar">
+        <TabsContent value="progress">
           <Card>
             <CardHeader>
               <CardTitle>Mastery by topic</CardTitle>
