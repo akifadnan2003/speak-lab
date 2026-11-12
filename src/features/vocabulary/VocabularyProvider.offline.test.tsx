@@ -25,7 +25,7 @@ describe('vocabulary saving while the browser reports itself offline', () => {
   // repositories handle offline themselves (durable queue, cached reads), so they must run anyway.
   it('still hands the answer to the repository and still reads records', async () => {
     const repository = createMemoryVocabularyRepository()
-    const services: VocabularyServices = { bank: createStaticVocabularyBank(), repository, storage: 'cloud' }
+    const services: VocabularyServices = { bank: createStaticVocabularyBank(), repository, storage: 'cloud', records: repository }
     const { wrapper } = harness(services)
     onlineManager.setOnline(false)
 

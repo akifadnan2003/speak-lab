@@ -68,6 +68,9 @@ Never claim a check passed without running it. Never delete a meaningful test to
   Exercise grading and progression rules are pure functions in `src/features/exercises/engine/` and
   `src/features/curriculum/progression.ts`; screens talk to persistence only through
   `src/features/curriculum/ports.ts`.
+- Progress analytics are pure functions in `src/features/progress/analytics/` over
+  `LearningRecords`; every metric is defined in `docs/PROGRESS_METRICS.md`. No metric may be shown
+  without the evidence that definition requires ("Not assessed yet" is the honest state).
 - Vocabulary follows the same split: entries in `src/features/vocabulary/content/bank.ts` (validated
   by `schema.ts`), pure scheduler/queue/stats in `srs/`, `revision/`, `stats.ts`, persistence behind
   `src/features/vocabulary/ports.ts`. Support-language text is optional and keyed by language.

@@ -1,73 +1,83 @@
-import type { WeeklyActivityDay } from '@/demo/student-home'
 import { cn } from '@/lib/utils'
-
-interface Props {
-  data: WeeklyActivityDay[]
-  className?: string
-}
+import type { WeeklyActivity } from './analytics'
 
 /**
- * Accessible bar chart for weekly practice minutes (SVG-free, CSS bars).
- * Speaking minutes are drawn as a darker segment inside each day's bar.
- * The table markup is exposed to screen readers via `sr-only`.
+ * Seven-day activity as stacked CSS bars (no chart library): lessons completed, exercises
+ * practised, vocabulary reviews and chapter checks per calendar day in the learner's time zone.
+ * Counts, never minutes: the app does not measure time on task. A `sr-only` table carries the
+ * same numbers for screen readers. Works down to 320 px: seven columns with 4 px gaps.
  */
-export function WeeklyActivityChart({ data, className }: Props) {
-  const max = Math.max(30, ...data.map((d) => d.minutes))
-  const total = data.reduce((sum, d) => sum + d.minutes, 0)
-  const speaking = data.reduce((sum, d) => sum + d.speakingMinutes, 0)
+const SEGMENTS = [
+  { key: 'lessonsCompleted', label: 'Lessons', className: 'bg-skill-grammar' },
+  { key: 'exercisesPractised', label: 'Exercises', className: 'bg-primary/55' },
+  { key: 'vocabularyReviews', label: 'Vocabulary', className: 'bg-skill-vocabulary' },
+  { key: 'checksSubmitted', label: 'Chapter checks', className: 'bg-warning' },
+] as const
 
+export function WeeklyActivityChart({ weekly, className }: { weekly: WeeklyActivity; className?: string }) {
+  const max = Math.max(5, ...weekly.days.map((d) => d.total))
   return (
-    <div className={cn('flex flex-col gap-3', className)}>
-      <div className="flex items-baseline justify-between text-sm">
+    <div className={cn('flex flex-col gap-3', className)} data-testid="weekly-activity" data-total={weekly.totals.total}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
         <p className="text-fg-muted">
-          <span className="font-semibold text-fg tabular">{total}</span> min this week
+          <span className="font-semibold text-fg tabular">{weekly.totals.total}</span> {weekly.totals.total === 1 ? 'activity' : 'activities'} on{' '}
+          <span className="font-semibold text-fg tabular">{weekly.activeDays}</span> of the last 7 days
         </p>
-        <p className="flex items-center gap-3 text-xs text-fg-muted">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm bg-primary/35" aria-hidden /> All practice
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2.5 rounded-sm bg-primary" aria-hidden /> Speaking ({speaking})
-          </span>
-        </p>
+        <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-fg-muted" aria-label="Legend">
+          {SEGMENTS.map((s) => (
+            <li key={s.key} className="inline-flex items-center gap-1.5">
+              <span className={cn('size-2.5 rounded-sm', s.className)} aria-hidden /> {s.label} ({weekly.totals[s.key]})
+            </li>
+          ))}
+        </ul>
       </div>
-      <div className="grid h-36 grid-cols-7 items-end gap-2" aria-hidden>
-        {data.map((day) => {
-          const height = (day.minutes / max) * 100
-          const speakingHeight = day.minutes ? (day.speakingMinutes / day.minutes) * 100 : 0
+      <div className="grid h-36 grid-cols-7 items-end gap-1 sm:gap-2" aria-hidden>
+        {weekly.days.map((day) => {
+          const height = (day.total / max) * 100
           return (
             <div key={day.day} className="flex h-full flex-col items-center justify-end gap-1.5">
               <div
-                className="relative flex w-full max-w-9 items-end overflow-hidden rounded-md bg-primary/35 transition-[height] duration-500"
-                style={{ height: `${Math.max(height, day.minutes ? 6 : 2)}%` }}
-                title={`${day.day}: ${day.minutes} min (${day.speakingMinutes} speaking)`}
+                className={cn('flex w-full max-w-9 flex-col-reverse overflow-hidden rounded-md bg-surface-3 transition-[height] duration-500', day.isToday && 'ring-2 ring-primary/40')}
+                style={{ height: `${Math.max(height, day.total ? 6 : 3)}%` }}
+                title={`${day.label}: ${day.total} ${day.total === 1 ? 'activity' : 'activities'}`}
               >
-                <div className="w-full rounded-b-md bg-primary" style={{ height: `${speakingHeight}%` }} />
+                {day.total > 0
+                  ? SEGMENTS.map((s) => (
+                      <div key={s.key} className={cn('w-full', s.className)} style={{ height: `${(day[s.key] / day.total) * 100}%` }} />
+                    ))
+                  : null}
               </div>
-              <span className="text-[11px] font-medium text-fg-muted">{day.day}</span>
+              <span className={cn('text-[11px] font-medium text-fg-muted', day.isToday && 'text-fg')}>{day.label}</span>
             </div>
           )
         })}
       </div>
-      <table className="sr-only">
-        <caption>Practice minutes by day</caption>
+      {/* Wrapped: a table keeps its content width even when sr-only, which caused horizontal overflow on phones. */}
+      <div className="sr-only">
+      <table>
+        <caption>Learning activity by day, last seven days</caption>
         <thead>
           <tr>
             <th scope="col">Day</th>
-            <th scope="col">Minutes</th>
-            <th scope="col">Speaking minutes</th>
+            {SEGMENTS.map((s) => (
+              <th key={s.key} scope="col">
+                {s.label}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {data.map((day) => (
+          {weekly.days.map((day) => (
             <tr key={day.day}>
               <th scope="row">{day.day}</th>
-              <td>{day.minutes}</td>
-              <td>{day.speakingMinutes}</td>
+              {SEGMENTS.map((s) => (
+                <td key={s.key}>{day[s.key]}</td>
+              ))}
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

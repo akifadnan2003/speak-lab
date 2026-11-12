@@ -8,6 +8,7 @@ import { createStaticVocabularyBank } from './content'
 import { createSupabaseVocabularyApi } from './persistence/api'
 import { ensureVocabularyCleanupRegistered, trackVocabularyRepository } from './persistence/cleanup'
 import { createCloudVocabularyRepository, type VocabularySync } from './persistence/cloud'
+import { reviewFromRow, stateFromRow } from './persistence/wire'
 import { createLocalStorageVocabularyRepository } from './persistence/local-storage'
 import type { VocabularyBankSource, VocabularyRepository, VocabularyReviewRecord, VocabularyState } from './ports'
 
@@ -26,6 +27,17 @@ export interface VocabularyServices {
   readonly importer?: LocalVocabularyImporter
   /** Queue status and explicit sync; absent when progress stays on the device. */
   readonly sync?: VocabularySync
+  /**
+   * Read-only access to any student's records the session is allowed to see (own rows, or a
+   * linked student's for the tutor). Unlike `repository`, it does not insist on the signed-in
+   * account: Row Level Security decides. Used by the progress analytics (M5).
+   */
+  readonly records: VocabularyRecordsReader
+}
+
+export interface VocabularyRecordsReader {
+  listStates(studentId: string): Promise<readonly VocabularyState[]>
+  listReviews(studentId: string): Promise<readonly VocabularyReviewRecord[]>
 }
 
 const VocabularyContext = createContext<VocabularyServices | null>(null)
@@ -37,7 +49,7 @@ export function createDefaultVocabularyServices(): VocabularyServices {
   const bank = createStaticVocabularyBank()
   const device = createLocalStorageVocabularyRepository()
   const client = getSupabaseClient()
-  if (!client) return { bank, repository: device, storage: 'device' }
+  if (!client) return { bank, repository: device, storage: 'device', records: device }
   const api = createSupabaseVocabularyApi(client)
   // The session's user id is only used to refuse mismatched requests; the database always
   // takes the student from the verified JWT.
@@ -60,6 +72,10 @@ export function createDefaultVocabularyServices(): VocabularyServices {
     storage: 'cloud',
     importer: createLocalVocabularyImporter({ device, api, getSessionUserId }),
     sync: repository,
+    records: {
+      listStates: async (studentId) => (await api.fetchStates(studentId, {})).map(stateFromRow),
+      listReviews: async (studentId) => (await api.fetchReviews(studentId, {})).map(reviewFromRow),
+    },
   }
 }
 

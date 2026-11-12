@@ -121,6 +121,27 @@ test.describe('student navigation', () => {
     await expect(page.getByTestId('vocab-stats')).toContainText('1 reviews today')
   })
 
+  test('progress page shows an honest empty state, then real records after one exercise', async ({ page }) => {
+    await setRole(page, 'student')
+    await page.goto('./#/progress')
+    await expect(page.getByRole('heading', { name: 'Your learning record' })).toBeVisible()
+    await expect(page.getByTestId('progress-empty')).toBeVisible()
+    await expect(page.getByTestId('weekly-activity')).toHaveAttribute('data-total', '0')
+    await expect(page.getByTestId('achievements-card')).toHaveAttribute('data-earned', '0')
+    await expect(page.locator('[data-testid="skill-row"][data-evidence="measured"]')).toHaveCount(0)
+
+    await page.goto('./#/learn/a0-01/lessons/a0-01-l01')
+    await page.getByRole('radio', { name: /She/ }).click()
+    await page.getByTestId('check-answer').click()
+    await expect(page.getByTestId('exercise-feedback')).toHaveAttribute('data-outcome', 'correct')
+
+    await page.goto('./#/progress')
+    await expect(page.getByTestId('overview-stats')).toHaveAttribute('data-empty', 'false')
+    await expect(page.getByTestId('weekly-activity')).toHaveAttribute('data-total', '1')
+    await expect(page.getByTestId('next-step').first()).toHaveAttribute('data-kind', 'continue')
+    await expect(page.getByTestId('weak-topics-empty')).toContainText('Not enough practice data')
+  })
+
   test('student cannot reach tutor routes', async ({ page }) => {
     await setRole(page, 'student')
     await page.goto('./#/tutor')
@@ -136,9 +157,9 @@ test.describe('tutor dashboard', () => {
     await expect(cards.first()).toBeVisible()
     await cards.first().click()
     await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
-    await page.getByRole('tab', { name: 'Grammar' }).click()
+    await page.getByRole('tab', { name: 'Progress' }).click()
     await expect(page.getByRole('columnheader', { name: 'Recurring error' })).toBeVisible()
-    await expect(page).toHaveURL(/\/grammar$/)
+    await expect(page).toHaveURL(/\/progress$/)
   })
 
   test('invite dialog opens, validates and closes with Escape', async ({ page }) => {

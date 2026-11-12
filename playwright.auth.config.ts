@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = 4173
+// Override locally when something else already listens on 4173 (Playwright would reuse it).
+const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 4173)
 const BASE_PATH = '/'
 
 /**

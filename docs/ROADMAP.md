@@ -7,9 +7,9 @@ Last updated 2026-11-12. Status legend: ✅ done · 🔄 in progress · ⏳ plan
 | M0 | Repository, architecture, documentation, commands, test strategy | ✅ |
 | M1 | Application foundation and design system | ✅ |
 | M2 | Authentication, authorization and student invitations | ✅ (live in production 2026-11-11) |
-| M3 | Curriculum and exercise engine | 🔄 integration built on `m3-integration`, PR open |
-| M4 | Vocabulary and revision | 🔄 integration built on `m4-integration`, PR open |
-| M5 | Student progress | ⏳ |
+| M3 | Curriculum and exercise engine | ✅ (live in production 2026-11-12) |
+| M4 | Vocabulary and revision | ✅ (live in production 2026-11-12) |
+| M5 | Student progress | 🔄 built on `m5-student-progress`, PR open |
 | M6 | Tutor dashboard | ⏳ |
 | M7 | AI speaking | ⏳ |
 | M8 | Advanced learning and localisation | ⏳ |
@@ -168,10 +168,25 @@ evidence in `docs/VOCABULARY_PERSISTENCE.md`, ADR-018, ADR-019):
 Remaining for M4: audio assets + listening mode, spoken-use mode (M7), tutor assignment of word sets
 and a tutor view of `student_vocabulary` (M6), parameter tuning from real review data.
 
-## M5 — Student Progress ⏳
+## M5 — Student Progress 🔄
 
-Learning activity timeline, skill mastery computation, weekly activity, weak-topic detection,
-achievements, metric definitions in UI. Replaces the remaining student-side demo fixtures.
+Design: `docs/superpowers/specs/2026-11-12-m5-student-progress-design.md`. Metric definitions:
+`docs/PROGRESS_METRICS.md`. ADR-021. Branch `m5-student-progress`.
+
+- [x] Pure analytics over existing records (no new tables, views or RPCs): overview, seven-day
+      activity (calendar days in the device zone), six skills with evidence or "Not assessed yet",
+      weak topics with thresholds, next steps, timeline with stable ids, deterministic achievements
+- [x] Student home and Progress page driven entirely by the learner's own records; the last
+      student-side demo fixtures (snapshot, weekly minutes, assignments, achievements, weak
+      topics, skills) removed. Honest empty state for a new learner
+- [x] Tutor profile: read-only **Progress** tab for linked students (same analytics, RLS-scoped)
+- [x] Paged reads of `exercise_attempts` and `assessment_attempts` (PostgREST 1000-row cap)
+- [x] Tests: analytics (empty, partial, completed, passed/failed checks, duplicates, lapses,
+      thresholds, achievements, time zones), Progress page and home with device records, shell
+      e2e, real-auth scenario (device 2 and the tutor's Progress tab)
+
+Deferred: time on task, speaking/writing scores (M7), listening (content), tutor assignments,
+notes, grading and feedback (M6).
 
 ## M6 — Tutor Dashboard ⏳
 

@@ -100,7 +100,8 @@ test('tutor invites a student; the student accepts the emailed link, sets a pass
   await student.getByLabel('Daily speaking target (minutes)').fill('20')
   await student.getByRole('button', { name: 'Start learning' }).click()
   await expect(student).toHaveURL(/#\/$/)
-  await expect(student.getByText(/recommended lesson/i)).toBeVisible()
+  await expect(student.getByTestId('continue-card')).toBeVisible()
+  await expect(student.getByTestId('home-metrics')).toBeVisible({ timeout: 30_000 })
 
   // Refreshing a protected route keeps the session.
   await student.goto('./#/settings')
@@ -256,10 +257,19 @@ test('student learns on this device, progress follows the account to another dev
   await expect(again.getByTestId('lesson-row').first()).toHaveAttribute('data-status', 'in_progress', { timeout: 30_000 })
   const rows = await admin.from('exercise_attempts').select('exercise_id, correct').eq('student_id', created.data.user!.id)
   expect(rows.data).toEqual([{ exercise_id: 'a0-01-l01-e01', correct: true }])
+  // The progress page on device 2 is computed from the account's rows: one exercise today, nothing invented.
+  await again.goto('./#/progress')
+  await expect(again.getByTestId('overview-stats')).toHaveAttribute('data-empty', 'false', { timeout: 30_000 })
+  await expect(again.getByTestId('weekly-activity')).toHaveAttribute('data-total', '1')
+  await expect(again.getByTestId('progress-storage-label')).toHaveText('Records in your account')
+  await expect(again.getByTestId('achievements-card')).toHaveAttribute('data-earned', '0')
 
   // The tutor places the student at A2: A0 and A1 are skipped, the A2 showcase chapter opens.
   await login(page, tutor.email, TUTOR_PASSWORD)
   await page.getByTestId('student-card').filter({ hasText: email }).click()
+  await page.getByRole('tab', { name: 'Progress' }).click()
+  await expect(page.getByTestId('student-progress')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId('weekly-activity')).toHaveAttribute('data-total', '1')
   await page.getByRole('tab', { name: 'Curriculum' }).click()
   await expect(page.getByTestId('current-chapter')).toContainText('A0')
   await page.getByTestId('place-at-level').selectOption('A2')

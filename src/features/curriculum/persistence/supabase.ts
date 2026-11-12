@@ -86,6 +86,9 @@ function fail(message: string): never {
   throw new Error(message)
 }
 
+/** PostgREST returns at most 1000 rows per request; list reads page through them. */
+const PAGE = 1000
+
 export function createSupabaseProgressRepository(client: AppSupabaseClient, chapters: readonly Chapter[]): ProgressRepository {
   const assessmentLessons = assessmentLessonIndex(chapters)
   return {
@@ -142,11 +145,23 @@ export function createSupabaseProgressRepository(client: AppSupabaseClient, chap
       if (error) fail(error.message)
     },
     async listAttempts(studentId, filter) {
-      let query = client.from('exercise_attempts').select('*').eq('student_id', studentId).order('created_at', { ascending: true })
-      if (filter?.lessonId) query = query.eq('lesson_id', filter.lessonId)
-      const { data, error } = await query
-      if (error) fail(error.message)
-      return (data as ExerciseAttemptRow[]).map(fromAttemptRow)
+      // Paged past PostgREST's default 1000-row cap: the progress analytics read every attempt.
+      const rows: ExerciseAttemptRow[] = []
+      for (let from = 0; ; from += PAGE) {
+        let query = client
+          .from('exercise_attempts')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1)
+        if (filter?.lessonId) query = query.eq('lesson_id', filter.lessonId)
+        const { data, error } = await query
+        if (error) fail(error.message)
+        const page = data as ExerciseAttemptRow[]
+        rows.push(...page)
+        if (page.length < PAGE) return rows.map(fromAttemptRow)
+      }
     },
     async listChapterOverrides(studentId) {
       const { data, error } = await client.from('chapter_access_overrides').select('*').eq('student_id', studentId)
@@ -208,12 +223,23 @@ export function createSupabaseAssessmentGateway(client: AppSupabaseClient): Asse
       return (await invokeAssessment(client, { action: 'submit', attemptId, answers })) as AssessmentResult
     },
     async listAttempts(studentId, filter) {
-      let query = client.from('assessment_attempts').select('*').eq('student_id', studentId).order('started_at', { ascending: true })
-      if (filter?.chapterId) query = query.eq('chapter_id', filter.chapterId)
-      if (filter?.lessonId) query = query.eq('lesson_id', filter.lessonId)
-      const { data, error } = await query
-      if (error) fail(error.message)
-      return (data as AssessmentAttemptRow[]).map(fromAssessmentRow)
+      const rows: AssessmentAttemptRow[] = []
+      for (let from = 0; ; from += PAGE) {
+        let query = client
+          .from('assessment_attempts')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('started_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1)
+        if (filter?.chapterId) query = query.eq('chapter_id', filter.chapterId)
+        if (filter?.lessonId) query = query.eq('lesson_id', filter.lessonId)
+        const { data, error } = await query
+        if (error) fail(error.message)
+        const page = data as AssessmentAttemptRow[]
+        rows.push(...page)
+        if (page.length < PAGE) return rows.map(fromAssessmentRow)
+      }
     },
     async reset({ studentId, chapterId, lessonId }) {
       await invokeAssessment(client, { action: 'reset', studentId, chapterId, lessonId })

@@ -40,9 +40,11 @@ function fakeSync(initial: number) {
 }
 
 function renderBadge(sync?: VocabularySync) {
+  const repository = createMemoryVocabularyRepository()
   const services: VocabularyServices = {
     bank: createStaticVocabularyBank(),
-    repository: createMemoryVocabularyRepository(),
+    repository,
+    records: repository,
     storage: sync ? 'cloud' : 'device',
     ...(sync ? { sync } : {}),
   }
