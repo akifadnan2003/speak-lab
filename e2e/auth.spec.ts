@@ -297,6 +297,9 @@ test('vocabulary answers follow the account, queue offline with a visible warnin
   // pass through one, so the later "offline" step would still reach the server.
   const device1 = await browser.newContext({ serviceWorkers: 'block' })
   const student = await device1.newPage()
+  const logs: string[] = []
+  student.on('console', (m) => logs.push(`${m.type()}: ${m.text()}`))
+  student.on('pageerror', (e) => logs.push(`pageerror: ${e.message}`))
   await login(student, email, STUDENT_PASSWORD)
   await expect(student).toHaveURL(/#\/$/)
   await student.goto('./#/vocabulary')
@@ -317,7 +320,15 @@ test('vocabulary answers follow the account, queue offline with a visible warnin
   await expect(student.getByTestId('flashcard-back')).toBeVisible()
   await student.getByRole('button', { name: /Good/ }).click()
   await expect(student.getByText('3 of 10')).toBeVisible()
-  await expect(student.getByTestId('vocab-pending-sync')).toHaveAttribute('data-count', '1', { timeout: 15_000 })
+  await student.waitForTimeout(3_000)
+  const diagnostics = async () =>
+    JSON.stringify({
+      outbox: await student.evaluate(() => Object.entries(localStorage).filter(([k]) => k.startsWith('speaklab.vocab'))),
+      onLine: await student.evaluate(() => navigator.onLine),
+      reviewsOnServer: (await admin.from('vocabulary_reviews').select('id').eq('student_id', studentId)).data?.length,
+      logs: logs.slice(-30),
+    })
+  await expect(student.getByTestId('vocab-pending-sync'), await diagnostics()).toHaveAttribute('data-count', '1', { timeout: 15_000 })
 
   // Signing out now would delete the queued answer, so the app warns first.
   await student.getByTestId('user-menu').click()
