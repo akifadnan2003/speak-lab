@@ -82,7 +82,9 @@ export function useStudentAssignments(studentId: string) {
     queryKey: homeworkKeys.tutorStudent(studentId),
     queryFn: () => (env.uiPreview ? [] : fetchHomeworkFor(studentId)),
     enabled: studentId.length > 0,
-    staleTime: 15_000,
+    // Submissions arrive from another device: refetch whenever the tab is opened or focused.
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   })
 }
 

@@ -341,7 +341,8 @@ test('tutor assigns written homework, the student submits it, the tutor reviews 
   const notes = await admin.from('teacher_notes').select('body').eq('student_id', studentId)
   expect(notes.data).toHaveLength(1)
 
-  // Tutor: review with feedback.
+  // Tutor: review with feedback (the tab refetches on open; a reload also covers a stale page).
+  await page.reload()
   await page.getByRole('tab', { name: 'Assignments' }).click()
   await expect(page.getByTestId('assignment-row')).toHaveAttribute('data-status', 'submitted', { timeout: 30_000 })
   await page.getByTestId('assignment-row').click()
