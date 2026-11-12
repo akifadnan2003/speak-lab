@@ -36,6 +36,13 @@ Supabase operations (setup, bootstrap, deploy, rollback): `docs/SUPABASE_SETUP.m
   account switching purge it.
 - Chapter checks are graded only by the `assessment` Edge Function; `assessment_attempts` is never
   written by clients and clients never submit scores. Practice progress is the learner's own rows.
+- Vocabulary progress is server-owned: clients have SELECT only on the vocabulary tables and submit
+  answers through `record_vocabulary_reviews`; the schedule is computed in SQL. Vocabulary is
+  formative practice and never feeds an assessment. The bank is mirrored by a generated migration
+  (`*_vocabulary_bank_v<n>.sql`, `bank-seed.test.ts`); never edit an applied seed.
+- Work queued on the device for the server (offline vocabulary answers) is registered with
+  `registerPendingLocalWork()` in `src/lib/local-data.ts`, shown to the learner while pending, and
+  offered an explicit sync in the sign-out dialog (`useGuardedSignOut`). The purge still runs.
 - Two generated artefacts, never edited by hand, regenerated with `npm run sync` after changing
   schemas, content, the grading engine, progression or `assessment-rules.ts` (CI checks both):
   `supabase/functions/_shared/features/**` (the Edge Function's copy) and

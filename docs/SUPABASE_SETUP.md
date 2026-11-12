@@ -203,6 +203,9 @@ For `npm run dev` against the local stack put the values from `supabase status` 
 - [ ] Custom SMTP configured and verified (section 1.3).
 - [ ] Invite and Reset-password templates replaced (section 1.4).
 - [ ] Manual backend workflow run successfully (migrations applied, both functions deployed).
+      After the M4 merge the plan must list `20261111160800_vocabulary_persistence` and
+      `20261111160900_vocabulary_bank_v1` (and `20261111150000_curriculum_progress` if M3 was not
+      applied yet); `select count(*) from public.vocabulary_items` returns 180 afterwards.
 - [ ] After the M3 integration merges: run the workflow again so `20261111150000_curriculum_progress.sql` and the `assessment` function reach the hosted project (dry run first).
 - [ ] Owner user created and `bootstrap_owner` returned `bootstrapped`.
 - [ ] Owner can sign in on the live site and sees **My Students** with zero students.

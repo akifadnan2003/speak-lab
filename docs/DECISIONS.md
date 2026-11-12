@@ -211,3 +211,54 @@ review ids), and refusing `preview-*` ids. Local records are never re-keyed to a
 **Consequences.** Review schedules are reproducible in tests, including time-zone cases. The
 Supabase repository is a drop-in. Listening/speaking modes are listed as unavailable until audio
 and the speech pipeline exist.
+
+## ADR-018 · The server owns the vocabulary schedule; clients only submit answers (2026-11-11, integrated 2026-11-12)
+
+**Context.** M4's spaced-repetition state (stage, ease, interval, due date, mastery) lived on the
+device. Moving it into the account must not let a browser upload whatever schedule it likes, must
+survive offline practice and a second device, and must respect the M2 rule that nothing of a
+student stays on a shared device.
+**Decision.** Clients have SELECT only on `vocabulary_items`, `student_vocabulary`,
+`vocabulary_reviews` and `vocabulary_student_meta`. The only write paths are two `security definer`
+functions that take the student from `auth.uid()` and refuse anyone who is not an active student:
+`record_vocabulary_reviews(p_expected_student, p_reviews, p_source)` validates each answer, derives
+the quality from the mode and answer flags, runs `public.vocabulary_schedule()` (a line-for-line
+port of the TypeScript scheduler, proven equal by `scheduler.sql-parity.test.ts`) and returns the
+server's states; `reset_vocabulary_progress(p_expected_student)` deletes the schedule, voids but
+keeps the history for the tutor and moves a reset watermark. Client-sent quality, interval, stage,
+ease and student id are ignored. `p_expected_student` is the account a queue was written under: it
+can only make a call fail, never grant anything. Ordering rules: review id is the primary key
+(idempotent replay); batches apply in `reviewed_at` order; an answer at or before the word's last
+review is stored as history without rewinding; an answer at or before the last reset is voided;
+`reviewed_at` is clamped to the server clock (+5 min) and must postdate the account.
+The browser keeps a durable per-account outbox (`speaklab.vocab.outbox.v1:<uid>`), overlays queued
+answers on the server copy, retries with backoff and on `online`, and refuses to flush a queue
+under a different session. The bank itself is mirrored by a generated migration
+(`*_vocabulary_bank_v<n>.sql`) that `bank-seed.test.ts` keeps equal to `bank.ts`; retired words
+are never deleted because reviews reference them.
+**Consequences.** Mastery and the schedule cannot be forged from the browser; the tutor sees every
+answer with server receive times. `correct` is still decided in the browser, so vocabulary remains
+formative self-practice and never feeds an official assessment (`assessment-isolation.test.ts`
+pins that the `assessment` function and the curriculum tables know nothing about vocabulary).
+Changing the scheduler means changing both implementations and the parity test.
+
+## ADR-019 · Queued offline answers are visible and are flushed explicitly before sign-out (2026-11-12)
+
+**Context.** With an offline queue, "Saved to your account" can be untrue for minutes or days, and
+the M2 purge on sign-out would silently delete answers that never reached the server. Flushing
+automatically inside `signOut()` would hide a network failure and, on a shared device, could run
+under a session that is no longer the queue's owner.
+**Decision.** `src/lib/local-data.ts` gains a *pending local work* registry next to the cleaners:
+a feature registers a reporter `(studentId) => { label, count, flush }`. The cloud vocabulary
+repository registers one and also notifies subscribers on every queue change, which drives a
+visible `PendingSyncBadge` ("N answers have not reached your account yet", with *Try now*) on the
+vocabulary dashboard and practice screens and a "waiting to sync" suffix on the storage label.
+Sign-out from the top bar goes through `useGuardedSignOut`: with nothing queued it signs out at
+once; otherwise a dialog names what is pending and offers *Sync and sign out* (flush, then sign
+out only if nothing remains, else report the remainder and let the learner retry), *Sign out and
+discard*, or *Stay signed in*. The flush is the feature's own code and only ever sends the
+signed-in account's queue; the purge still runs on every sign-out, so account isolation is
+unchanged.
+**Consequences.** The UI never claims more than the server holds. Losing queued answers is an
+explicit choice, never a side effect. Other features that queue work (drafts, offline attempts)
+plug into the same registry without touching auth code.

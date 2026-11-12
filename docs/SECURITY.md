@@ -24,6 +24,8 @@ endpoints, a revoked student with a still-open session.
 | Audit the lifecycle | `account_events`: account created, invitation sent/resent/revoked/accepted, disabled/reactivated, owner bootstrapped. No tokens or secrets are stored. |
 | Revocation is server-side | Disable = `status = 'disabled'` + Auth ban. RLS denies immediately; refresh and sign-in are refused. Not merely a local sign-out. |
 | Assessments are graded server-side | `assessment_attempts` is written only by the `assessment` Edge Function (service role); clients have SELECT. The function verifies the caller, recomputes the chapter gate from the database, grades raw answers with the shared engine copy, enforces 3 attempts per chapter version and a 2 h attempt expiry, and discloses correct answers only after a pass or on the last attempt. Chapter completion requires a passed attempt, so no client write completes a chapter. Real builds ship a generated curriculum with assessment answer keys removed (`npm run sync:content`); the full content exists only in preview builds and in the function's copy. |
+| The vocabulary schedule is server-owned | Clients have SELECT only on the four vocabulary tables. Answers are submitted through `record_vocabulary_reviews` (`security definer`, student from `auth.uid()`, active students only), which derives quality and runs the SQL scheduler; `reset_vocabulary_progress` is the only other write. Client-sent schedule fields and student ids are ignored, and a queue written under another account is refused (`p_expected_student`). Vocabulary is formative practice and never feeds an assessment (`assessment-isolation.test.ts`). |
+| Queued work is never lost silently | Answers recorded offline stay in a per-account outbox and are shown as "not reached your account yet". Sign-out warns about them and offers an explicit sync first; the flush only sends the signed-in account's queue and the device purge still runs afterwards (ADR-019). |
 | Nothing of a student stays on a shared device | `src/lib/local-data.ts`: sign-out, the SIGNED_OUT event and a change of the active user id purge every `speaklab.*` storage key except the theme and the auth session, run registered feature cleaners (M3 registers `clearStoredProgress`), delete `speaklab*` IndexedDB databases and clear the TanStack Query cache. The profile query of a new user waits for this purge. |
 
 ## 3. Authorization rules (as implemented in `supabase/migrations/20261103120000_identity_and_access.sql`)
@@ -42,6 +44,10 @@ Helper functions (`SECURITY DEFINER`, `STABLE`, `search_path = ''`, executable b
 | `exercise_attempts` (M3) | own rows; tutor → linked students | never | INSERT own rows when active (client id = idempotency key) |
 | `chapter_access_overrides` (M3) | own rows; tutor → linked students | never | tutor INSERT/DELETE for linked students only (audited) |
 | `assessment_attempts` (M3) | own rows; tutor → linked students | never | never from clients (Edge Function `assessment` with service role) |
+| `vocabulary_items` (M4) | active users | never | never from clients (generated seed migration) |
+| `student_vocabulary` (M4) | own rows; tutor → linked students | never | never from clients (`record_vocabulary_reviews` / `reset_vocabulary_progress`, `security definer`) |
+| `vocabulary_reviews` (M4) | own rows; tutor → linked students | never | never from clients (same functions; reviews are voided, never deleted) |
+| `vocabulary_student_meta` (M4) | own rows; tutor → linked students | never | never from clients |
 
 `bootstrap_owner(uuid)`: refuses client callers, requires an existing **confirmed** Auth user,
 returns `already-owner` for the existing tutor, raises for any other id when a tutor exists.
@@ -115,6 +121,13 @@ answer key. Every submission and reset is logged in `account_events`.
    A determined learner could still read the two inherent kinds from the page.
 8. **Attempt expiry is wall-clock based** (2 h). The function voids an expired open attempt on the
    next start; it does not count against the three attempts.
+9. **Vocabulary `correct` is decided in the browser.** The server derives quality and the schedule
+   from the submitted flags, so a modified client could submit unearned "correct" answers for its
+   own account. Acceptable for formative self-practice: the tutor sees every answer with server
+   receive times, and vocabulary progress never counts towards an assessment (ADR-018).
+10. **Discarding queued answers is possible.** A learner who chooses *Sign out and discard* (or
+    whose device is purged by a different account signing in) loses answers that never reached the
+    server. The pending-sync badge and the sign-out dialog make this explicit (ADR-019).
 
 ## 7. AI endpoints (M7)
 

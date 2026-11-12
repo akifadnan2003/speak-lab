@@ -1,15 +1,13 @@
-# Vocabulary persistence (M4 integration preparation)
+# Vocabulary persistence (M4 integration)
 
-Status: **prepared on branch `m4-integration-prep`, not merged, not deployed.** Nothing here has
-been applied to the hosted Supabase project. This document is the design, the security model, the
-evidence, and the integration handoff for moving M4 vocabulary progress from the device into the
-student's account.
+Status: **integrated on branch `m4-integration` (2026-11-12), awaiting review; not deployed.**
+Nothing here has been applied to the hosted Supabase project until the owner runs the manual
+backend workflow after the merge. This document is the design, the security model, the evidence,
+and the record of how M4 vocabulary progress moved from the device into the student's account.
 
-Provisional decision record: the ADR below is numbered `ADR-M4P` on purpose. `docs/DECISIONS.md`
-on `main` (M2) and on the M3/M4 branches both use ADR-009 to ADR-011 for different decisions. The
-M3 integration (PR #2, `c387abc`) renumbered its ADRs to 013 to 016, so on that base M4's
-"Vocabulary: SM-2-style scheduler…" becomes **ADR-017** and `ADR-M4P` becomes **ADR-018**. Move it
-into `docs/DECISIONS.md` with the next free number at integration time.
+Decision records: the write path below is **ADR-018** in `docs/DECISIONS.md` (it was `ADR-M4P`
+while prepared on `m4-integration-prep`); M4's scheduler decision is ADR-017; the pending-sync
+indicator and guarded sign-out added at integration are ADR-019.
 
 ---
 
@@ -49,7 +47,7 @@ To change the bank: bump `VOCABULARY_BANK_SEED` (version + new timestamped file 
 `npx vitest run src/features/vocabulary/content/bank-seed.test.ts -u`. Never edit an applied seed;
 words removed from the bank are retired, not deleted, because reviews reference them.
 
-## 3. Write path and security model (`ADR-M4P`)
+## 3. Write path and security model (ADR-018)
 
 **Decision.** The server owns the spaced-repetition schedule. Clients have SELECT only on every
 vocabulary table. There are exactly two write functions, both `security definer`, both taking the
@@ -148,10 +146,14 @@ Applied identically to live practice, offline queues, a second device and the lo
   reach: in-memory caches, optimistic states and retry timers of live repositories.
 - M2's `AuthProvider` already calls `queryClient.clear()` on sign-out and account switch; vocabulary
   query keys are `['student', <id>, …]`.
-- **Known trade-off:** answers still queued *offline* at sign-out are discarded with the rest of the
-  device data (correct for shared devices). Optional follow-up for the auth owner: before
-  `clearLocalStudentData()` in `signOut()`, await a best-effort flush of the cloud repository with a
-  short timeout. Not done here because it edits an auth file.
+- **Queued answers at sign-out (resolved at integration, ADR-019).** The cloud repository registers
+  a *pending work* reporter with `registerPendingLocalWork()` (`src/lib/local-data.ts`) and notifies
+  subscribers on every queue change. `PendingSyncBadge` shows "N answers have not reached your
+  account yet" with *Try now* on the dashboard and practice screens, and the storage label gains a
+  "waiting to sync" suffix. The top-bar sign-out goes through `useGuardedSignOut`: with a non-empty
+  queue it offers *Sync and sign out* (flush, sign out only when nothing remains, otherwise report
+  the remainder), *Sign out and discard*, or *Stay signed in*. The flush only sends the signed-in
+  account's queue; `clearLocalStudentData()` still runs on every sign-out.
 
 ## 8. Evidence
 
@@ -161,7 +163,9 @@ Applied identically to live practice, offline queues, a second device and the lo
 | TS scheduler ≡ SQL scheduler (40 seeded sequences, mastery, lapses, hard cap, 5 time zones, DST) | `src/features/vocabulary/srs/scheduler.sql-parity.test.ts` | Real Postgres via PGlite; mutation-checked | ✅ `npm run test` |
 | Bank seed matches `bank.ts` | `content/bank-seed.test.ts` | File snapshot | ✅ |
 | Sync, offline queue, retry, cross-device restore, account-switch race, conflicts, reset, import, consent UI, cleanup through M2's real `clearLocalStudentData()` | `persistence/*.test.ts`, `cloud-import.test.ts`, `components/LocalImportCard.test.tsx` | Unit/integration with an in-memory **model** of the server. Not security evidence. | ✅ |
-| GoTrue JWTs through PostgREST, Data API exposure, concurrent duplicate submissions | `supabase/tests/vocabulary-rls.test.ts` | Full local Supabase stack | ❌ **Not executed** (no Docker on this machine; `ci.yml` runs it only on pull requests and pushes to `main`) |
+| GoTrue JWTs through PostgREST, Data API exposure, concurrent duplicate submissions | `supabase/tests/vocabulary-rls.test.ts` | Full local Supabase stack | CI `database` job on the M4 integration PR (see the PR for the run) |
+| Online answer, offline queue with visible warning, guarded sign-out with explicit sync, restore on a second device, no device residue | `e2e/auth.spec.ts` "vocabulary answers follow the account…" | Production bundle against the full local stack, desktop + Pixel 7 | CI `database` job on the M4 integration PR |
+| Vocabulary never feeds assessments; migrations do not cross-reference | `src/features/vocabulary/assessment-isolation.test.ts` | Source-level pin | ✅ `npm run test` |
 
 PGlite does not run GoTrue, PostgREST or concurrent connections; that is what the stack test is for.
 
@@ -246,12 +250,11 @@ purged by M2 regardless. An `App.tsx` import is optional for symmetry.
 2. Deploying: after merge, the owner runs `supabase-deploy.yml` (migrations). Never from the dashboard.
 3. If M3 integration adds a `curriculum_chapters` table: add an FK or a validation trigger for
    `vocabulary_items.chapter_ids`.
-4. Optional best-effort flush before sign-out (auth owner, see §7).
+4. ~~Optional best-effort flush before sign-out~~ Done at integration as an explicit, visible sync (ADR-019).
 5. Tutor UI (M6): read `student_vocabulary` / `vocabulary_reviews` for linked students; the
    policies are already in place.
 6. Move `persistence/wire.ts` row types into `src/lib/supabase/database.types.ts` once that file is
    free of concurrent edits.
-7. A UI indicator for queued answers (`pendingCount`) and refetch after a background retry. Until
-   then the header says "Saved to your account (answers given offline sync on reconnect)" rather
-   than claiming everything is synced.
+7. ~~A UI indicator for queued answers~~ Done at integration (`PendingSyncBadge`, `useVocabularyPendingCount`).
+   Refetch of the dashboard after a background retry is still manual (reload or next navigation).
 8. Rate limiting or server-side grading if vocabulary ever counts towards an assessment.

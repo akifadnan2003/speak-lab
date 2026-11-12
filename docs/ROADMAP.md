@@ -1,6 +1,6 @@
 # SpeakLab — Roadmap and Milestones
 
-Last updated 2026-11-11. Status legend: ✅ done · 🔄 in progress · ⏳ planned.
+Last updated 2026-11-12. Status legend: ✅ done · 🔄 in progress · ⏳ planned.
 
 | Milestone | Scope | Status |
 | --- | --- | --- |
@@ -143,8 +143,30 @@ Done (frontend-independent slice):
       for sign-out, explicit snapshot export that refuses preview ids
 - [x] 56 new tests (171 total); e2e flashcard flow
 
-Remaining for M4: Supabase repository and tables, audio assets + listening mode, spoken-use mode
-(M7), tutor assignment of word sets (M6), parameter tuning from real review data.
+Integration onto the authenticated foundation (branch `m4-integration`, 2026-11-12; design and
+evidence in `docs/VOCABULARY_PERSISTENCE.md`, ADR-018, ADR-019):
+
+- [x] `worktree-m4-vocabulary` merged unchanged onto the M3 integration (router, roadmap and ADR
+      numbering resolved; M4's vocabulary ADR is ADR-017), then the preparation commits
+      `9bf65d7..m4-integration-prep` replayed without the scaffolding merge
+- [x] Migrations `20261111160800_vocabulary_persistence.sql` (tables, RLS, `record_vocabulary_reviews`,
+      `reset_vocabulary_progress`, SQL scheduler) and `20261111160900_vocabulary_bank_v1.sql`
+      (generated bank mirror, 180 entries); both newer than every applied migration
+- [x] Server-owned schedule: clients SELECT only, answers submitted through the RPC, quality and
+      schedule derived on the server, per-student RLS, tutor read of linked students
+- [x] Cloud repository with durable per-account outbox, retry/backoff, optimistic overlay, offline
+      fallback to the last server copy, cross-device restore, consented local-to-cloud import
+- [x] Visible pending-sync indicator on the dashboard and practice screens; sign-out guard that
+      warns about queued answers and offers an explicit sync before the device purge
+- [x] Cleanup wired to M2: `speaklab.vocab.*` keys purged, repository caches and timers disposed on
+      sign-out and account switch
+- [x] Vocabulary results never reach assessments (`assessment-isolation.test.ts`)
+- [x] Tests: 305 unit (PGlite scheduler parity, outbox, cloud repository, import, cleanup, badge,
+      sign-out guard), 22 PGlite RLS tests, 7 full-stack RLS tests, real-auth browser scenario
+      (online answer, offline queue + warning, guarded sign-out, device 2 restore)
+
+Remaining for M4: audio assets + listening mode, spoken-use mode (M7), tutor assignment of word sets
+and a tutor view of `student_vocabulary` (M6), parameter tuning from real review data.
 
 ## M5 — Student Progress ⏳
 
